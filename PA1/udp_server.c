@@ -63,6 +63,36 @@ int main (int argc, char * argv[] )
                 &remote_length);
 
 	printf("The client says %s\n", buffer);
+	
+	//According to the command entered by the user, perform the appropriate task
+	if (strncmp(buffer, "get", 3) == 0)
+	{
+		printf("get entered\n");
+		char *ret = strchr(buffer, ' ');
+		FILE *fd = fopen(ret+1, "r");
+		if (fd == NULL)
+			perror("fopen");
+	}
+	else if (strncmp(buffer, "put", 3) == 0)
+	{
+		printf("put entered\n");
+	}
+	else if (strncmp(buffer, "delete", 3) == 0)
+	{
+		printf("delete entered\n");
+	}
+	else if (strcmp(buffer, "ls") == 0)
+	{
+		printf("ls entered. Output:\n");
+		system(buffer);
+	}
+	else if (strcmp(buffer, "exit") == 0)
+	{
+		printf("Server exiting...\n");
+		exit(0);
+
+	}
+	else printf("Incorrect command entered, do nothing.\n");
 
 	char msg[] = "orange";
 	nbytes = sendto(sock, (const char *)msg, strlen(msg), 
