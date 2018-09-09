@@ -63,15 +63,32 @@ int main (int argc, char * argv[] )
                 &remote_length);
 
 	printf("The client says %s\n", buffer);
+
+	// Buffer to store data to be sent to the client
+	char data_buffer[1024*1024*4];                 
 	
 	//According to the command entered by the user, perform the appropriate task
 	if (strncmp(buffer, "get", 3) == 0)
 	{
-		printf("get entered\n");
 		char *ret = strchr(buffer, ' ');
-		FILE *fd = fopen(ret+1, "r");
-		if (fd == NULL)
-			perror("fopen");
+		FILE *fd = fopen(ret+1,"r");
+  		if(fd==NULL)
+    		{
+      			perror("fopen failed\n");
+    		}
+		
+		// Get file size
+  		fseek(fd,0,SEEK_END);
+  		size_t file_size = ftell(fd);
+  		fseek(fd,0,SEEK_SET);
+		printf("%ld\n",file_size);
+		// Copy data from the file into a buffer to transmit it to the client
+  		size_t fr = fread(data_buffer,file_size,1,fd);
+		if (fr<=0)
+    		{
+      			perror("fread failed\n");
+    		}
+		fclose(fd);
 	}
 	else if (strncmp(buffer, "put", 3) == 0)
 	{
@@ -79,12 +96,33 @@ int main (int argc, char * argv[] )
 	}
 	else if (strncmp(buffer, "delete", 3) == 0)
 	{
-		printf("delete entered\n");
+		char *ret = strchr(buffer, ' ');
+		printf("Deleting %s\n", ret+1);
+		remove(ret+1);
 	}
 	else if (strcmp(buffer, "ls") == 0)
 	{
 		printf("ls entered. Output:\n");
-		system(buffer);
+		FILE *fls = popen("ls>ls_op.txt", "r");	
+		FILE *fd = fopen("ls_op.txt","r");
+  		if(fd==NULL)
+    		{
+      			perror("fopen failed");
+    		}
+		
+		// Get file size
+  		fseek(fd,0,SEEK_END);
+  		size_t file_size = ftell(fd);
+  		fseek(fd,0,SEEK_SET);
+
+		// Copy data from the file into a buffer to transmit it to the client
+  		size_t fr = fread(data_buffer,file_size,1,fd);
+		if (fr<=0)
+    		{
+      			perror("fread failed\n");
+    		}
+		fclose(fd);
+		
 	}
 	else if (strcmp(buffer, "exit") == 0)
 	{
@@ -93,13 +131,12 @@ int main (int argc, char * argv[] )
 
 	}
 	else printf("Incorrect command entered, do nothing.\n");
-
+	printf("%ld\n", sizeof(data_buffer));
 	char msg[] = "orange";
-	nbytes = sendto(sock, (const char *)msg, strlen(msg), 
-        	MSG_CONFIRM, (const struct sockaddr *) &remote,
-            remote_length);
+	nbytes = sendto(sock, (const char *)data_buffer, strlen(data_buffer), 
+        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+            			remote_length);
 	printf("Message sent from server\n");
 
 	close(sock);
 }
-
