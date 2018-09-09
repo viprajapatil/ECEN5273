@@ -12,7 +12,7 @@
 #include <memory.h>
 #include <errno.h>
 
-#define MAXBUFSIZE 100
+#define MAXBUFSIZE 1024*1024
 
 int main (int argc, char * argv[])
 {
@@ -22,7 +22,7 @@ int main (int argc, char * argv[])
 	char buffer[MAXBUFSIZE];
 
 	struct sockaddr_in remote;              //"Internet socket address structure"
-
+	
 	if (argc < 3)
 	{
 		printf("USAGE:  <server_ip> <server_port>\n");
@@ -47,6 +47,7 @@ int main (int argc, char * argv[])
 
 	//Ask the user to enter the command
 	char command[100];
+
 	printf("Enter the appropriate command:\n");
 	scanf("%[^\n]s",command);
 
@@ -67,9 +68,24 @@ int main (int argc, char * argv[])
 	nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE, 
                 MSG_WAITALL, (struct sockaddr *) &from_addr,
                 &addr_length);  
-	printf("Server says %s\n", buffer);
+
+	if (strncmp(command, "get", 3) == 0)
+	{
+		FILE *fp=fopen("server_received_file","w+");
+  		if(fwrite(buffer,1,sizeof(buffer),fp)<0)
+    		{
+      			perror("error writting file");
+    		}
+		// Get file size
+  		fseek(fp,0,SEEK_END);
+  		size_t file_size = ftell(fp);
+  		fseek(fp,0,SEEK_SET);
+		printf("%ld\n",sizeof(buffer));
+		printf("%ld\n",file_size);
+		fclose(fp);
+	}
+	else printf("Server says\n%s", buffer);
 
 	close(sock);
 
 }
-
