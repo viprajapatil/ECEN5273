@@ -13,7 +13,8 @@
 #include <memory.h>
 #include <string.h>
 
-#define MAXBUFSIZE 100
+#define MAXBUFSIZE 512
+
 
 int main (int argc, char * argv[] )
 {
@@ -22,6 +23,8 @@ int main (int argc, char * argv[] )
 	unsigned int remote_length;         //length of the sockaddr_in structure
 	int nbytes;                        //number of bytes we receive in our message
 	char buffer[MAXBUFSIZE];             //a buffer to store our received message
+	int buff_size = 100;
+	int a = 0;
 	if (argc != 2)
 	{
 		printf ("USAGE:  <port>\n");
@@ -46,7 +49,7 @@ int main (int argc, char * argv[] )
 
 
 	/******************
-	  Once we've created a socket, we must bind that socket to the 
+	  Once we've created a socket, we must bind that socket to the
 	  local address and port we've supplied in the sockaddr_in struct
 	 ******************/
 	if (bind(sock, (struct sockaddr *)&sin, sizeof(sin)) < 0)
@@ -58,15 +61,15 @@ int main (int argc, char * argv[] )
 
 	//waits for an incoming message
 	bzero(buffer,sizeof(buffer));
-	nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE, 
+	nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
                 MSG_WAITALL, ( struct sockaddr *) &remote,
                 &remote_length);
 
 	printf("The client says %s\n", buffer);
 
 	// Buffer to store data to be sent to the client
-	char data_buffer[1024*1024*4];                 
-	
+	char data_buffer[1024*1024*4];
+
 	//According to the command entered by the user, perform the appropriate task
 	if (strncmp(buffer, "get", 3) == 0)
 	{
@@ -76,19 +79,50 @@ int main (int argc, char * argv[] )
     		{
       			perror("fopen failed\n");
     		}
-		
+
 		// Get file size
   		fseek(fd,0,SEEK_END);
   		size_t file_size = ftell(fd);
   		fseek(fd,0,SEEK_SET);
 		printf("%ld\n",file_size);
+
 		// Copy data from the file into a buffer to transmit it to the client
-  		size_t fr = fread(data_buffer,file_size,1,fd);
-		if (fr<=0)
-    		{
-      			perror("fread failed\n");
-    		}
+  		size_t fr;
+			char file_size_str[100];
+			sprintf(file_size_str,"%ld", file_size);
+			strcpy(data_buffer,file_size_str);
+			nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
+        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+            			remote_length);
+			printf("nbytes %i\n", nbytes);
+
+			file_size = atoi(data_buffer);
+		while(a <= file_size)
+		{
+			a += buff_size;
+			int num = a - file_size;
+			if (num > 0)
+			{
+				printf("In while loop...%ld\n",(a-file_size));
+				buff_size = file_size - (a-buff_size);
+			}
+			printf("buff size %i\n", buff_size);
+			fr = fread(data_buffer,buff_size,1,fd);
+			if (fr<0)
+    			{
+      				perror("fread failed\n");
+    			}
+
+			nbytes = sendto(sock, (const char *)data_buffer, buff_size,
+        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+            			remote_length);
+
+			printf(" send bytes %i\n",nbytes);
+		}
+
+		printf("File sent...\n");
 		fclose(fd);
+
 	}
 	else if (strncmp(buffer, "put", 3) == 0)
 	{
@@ -103,17 +137,18 @@ int main (int argc, char * argv[] )
 	else if (strcmp(buffer, "ls") == 0)
 	{
 		printf("ls entered. Output:\n");
-		FILE *fls = popen("ls>ls_op.txt", "r");	
+		FILE *fls = popen("ls>ls_op.txt", "r");
 		FILE *fd = fopen("ls_op.txt","r");
   		if(fd==NULL)
     		{
       			perror("fopen failed");
     		}
-		
+
 		// Get file size
   		fseek(fd,0,SEEK_END);
   		size_t file_size = ftell(fd);
   		fseek(fd,0,SEEK_SET);
+
 
 		// Copy data from the file into a buffer to transmit it to the client
   		size_t fr = fread(data_buffer,file_size,1,fd);
@@ -122,7 +157,7 @@ int main (int argc, char * argv[] )
       			perror("fread failed\n");
     		}
 		fclose(fd);
-		
+
 	}
 	else if (strcmp(buffer, "exit") == 0)
 	{
@@ -131,11 +166,14 @@ int main (int argc, char * argv[] )
 
 	}
 	else printf("Incorrect command entered, do nothing.\n");
-	printf("%ld\n", sizeof(data_buffer));
-	char msg[] = "orange";
-	nbytes = sendto(sock, (const char *)data_buffer, strlen(data_buffer), 
+
+	/*while(a <= sizeof(data_buffer))
+	{
+	a += MAXBUFSIZE;
+	nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
+	}*/
 	printf("Message sent from server\n");
 
 	close(sock);
