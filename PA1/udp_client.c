@@ -23,7 +23,8 @@ int main (int argc, char * argv[])
 	long int a = 0;
 	struct sockaddr_in remote;              //"Internet socket address structure"
 	int buff_size = 100;
-  int file_size;
+  	int file_size;
+	char data_buffer[1024*1024*4];
 
 	if (argc < 3)
 	{
@@ -68,7 +69,8 @@ int main (int argc, char * argv[])
 	int addr_length = sizeof(struct sockaddr);
 	bzero(buffer,sizeof(buffer));
 
-	if (strncmp(command, "get", 3) == 0)
+
+	if ((strcmp(buffer, "ls") == 0)|(strncmp(command, "get", 3) == 0))
 	{
 		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
 									MSG_WAITALL, (struct sockaddr *) &from_addr,
@@ -98,6 +100,54 @@ int main (int argc, char * argv[])
 		}
 			printf("File received...\n");
 		fclose(fp);
+	}
+	else if (strncmp(command, "put", 3) == 0)
+	{
+		char *ret = strchr(command, ' ');
+		FILE *fd = fopen(ret+1,"r");
+  		if(fd==NULL)
+    		{
+      			perror("fopen failed\n");
+    		}
+
+		// Get file size
+  		fseek(fd,0,SEEK_END);
+  		size_t file_size_put = ftell(fd);
+  		fseek(fd,0,SEEK_SET);
+		printf("%ld\n",file_size_put);
+
+		// Copy data from the file into a buffer to transmit it to the client
+  		size_t fr;
+		char file_size_str[100];
+		sprintf(file_size_str,"%ld", file_size_put);
+		strcpy(data_buffer,file_size_str);
+		nbytes = sendto(sock, (const char *)data_buffer, strlen(data_buffer),
+		        	MSG_CONFIRM, (const struct sockaddr *) &remote,
+		            	sizeof(remote));
+		printf("nbytes %i\n", nbytes);
+
+		while(a <= file_size_put)
+		{
+			a += buff_size;
+			int num = a - file_size_put;
+			if (num > 0)
+			{
+				printf("In while loop...%ld\n",(a-file_size_put));
+				buff_size = file_size_put - (a-buff_size);
+			}
+			printf("buff size %i\n", buff_size);
+			fr = fread(data_buffer,buff_size,1,fd);
+			if (fr<0)
+    			{
+      				perror("fread failed\n");
+    			}
+
+			nbytes = sendto(sock, (const char *)data_buffer, buff_size,
+        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+            			sizeof(remote));
+
+			printf(" send bytes %i\n",nbytes);
+		}
 	}
 	else printf("Server says\n%s", buffer);
 
