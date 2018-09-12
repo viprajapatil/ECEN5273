@@ -12,7 +12,7 @@
 #include <memory.h>
 #include <errno.h>
 
-#define MAXBUFSIZE 1024*1024
+#define MAXBUFSIZE 100
 
 int main (int argc, char * argv[])
 {
@@ -20,9 +20,11 @@ int main (int argc, char * argv[])
 	int nbytes;                             // number of bytes send by sendto()
 	int sock;                               //this will be our socket
 	char buffer[MAXBUFSIZE];
-
+	long int a = 0;
 	struct sockaddr_in remote;              //"Internet socket address structure"
-	
+	int buff_size = 100;
+  int file_size;
+
 	if (argc < 3)
 	{
 		printf("USAGE:  <server_ip> <server_port>\n");
@@ -31,7 +33,7 @@ int main (int argc, char * argv[])
 
 	/******************
 	  Here we populate a sockaddr_in struct with
-	  information regarding where we'd like to send our packet 
+	  information regarding where we'd like to send our packet
 	  i.e the Server.
 	 ******************/
 	bzero(&remote,sizeof(remote));               //zero the struct
@@ -52,12 +54,12 @@ int main (int argc, char * argv[])
 	scanf("%[^\n]s",command);
 
 	/******************
-	  sendto() sends immediately.  
+	  sendto() sends immediately.
 	  it will report an error if the message fails to leave the computer
 	  however, with UDP, there is no error if the message is lost in the network once it leaves the computer.
 	 ******************/
 	nbytes = sendto(sock, (const char *)command, strlen(command),
-        	MSG_CONFIRM, (const struct sockaddr *) &remote, 
+        	MSG_CONFIRM, (const struct sockaddr *) &remote,
             	sizeof(remote));
 	printf("Message sent from Client\n");
 
@@ -65,23 +67,36 @@ int main (int argc, char * argv[])
 	struct sockaddr_in from_addr;
 	int addr_length = sizeof(struct sockaddr);
 	bzero(buffer,sizeof(buffer));
-	nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE, 
-                MSG_WAITALL, (struct sockaddr *) &from_addr,
-                &addr_length);  
 
 	if (strncmp(command, "get", 3) == 0)
 	{
-		FILE *fp=fopen("server_received_file","w+");
-  		if(fwrite(buffer,1,sizeof(buffer),fp)<0)
-    		{
-      			perror("error writting file");
-    		}
-		// Get file size
-  		fseek(fp,0,SEEK_END);
-  		size_t file_size = ftell(fp);
-  		fseek(fp,0,SEEK_SET);
-		printf("%ld\n",sizeof(buffer));
-		printf("%ld\n",file_size);
+		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+									MSG_WAITALL, (struct sockaddr *) &from_addr,
+									&addr_length);
+
+		file_size = atoi(buffer);
+		printf("file_size %s\n", buffer);
+
+		FILE *fp;
+		fp = fopen("server_received_file","w+");
+		while(a<= file_size)
+		{
+			a += buff_size;
+			if (a%file_size < buff_size)
+			{
+				buff_size = a%file_size;
+			}
+
+			nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+                		0, (struct sockaddr *)&from_addr,
+                		&addr_length);
+			printf("received bytes %i\n",nbytes);
+			if(fwrite(buffer,1,nbytes,fp)<0)
+    			{
+      				perror("error writting file");
+    			}
+		}
+			printf("File received...\n");
 		fclose(fp);
 	}
 	else printf("Server says\n%s", buffer);
