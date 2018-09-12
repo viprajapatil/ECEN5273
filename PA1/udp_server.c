@@ -25,6 +25,8 @@ int main (int argc, char * argv[] )
 	char buffer[MAXBUFSIZE];             //a buffer to store our received message
 	int buff_size = 100;
 	int a = 0;
+	size_t file_size;
+
 	if (argc != 2)
 	{
 		printf ("USAGE:  <port>\n");
@@ -82,21 +84,21 @@ int main (int argc, char * argv[] )
 
 		// Get file size
   		fseek(fd,0,SEEK_END);
-  		size_t file_size = ftell(fd);
+  		file_size = ftell(fd);
   		fseek(fd,0,SEEK_SET);
 		printf("%ld\n",file_size);
 
 		// Copy data from the file into a buffer to transmit it to the client
   		size_t fr;
-			char file_size_str[100];
-			sprintf(file_size_str,"%ld", file_size);
-			strcpy(data_buffer,file_size_str);
-			nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
+		char file_size_str[100];
+		sprintf(file_size_str,"%ld", file_size);
+		strcpy(data_buffer,file_size_str);
+		nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
-			printf("nbytes %i\n", nbytes);
+		printf("nbytes %i\n", nbytes);
+		file_size = atoi(data_buffer);
 
-			file_size = atoi(data_buffer);
 		while(a <= file_size)
 		{
 			a += buff_size;
@@ -126,7 +128,35 @@ int main (int argc, char * argv[] )
 	}
 	else if (strncmp(buffer, "put", 3) == 0)
 	{
-		printf("put entered\n");
+		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+	                MSG_WAITALL, ( struct sockaddr *) &remote,
+	                &remote_length);
+
+		file_size = atoi(buffer);
+		printf("file_size %s\n", buffer);
+		int num_put;
+		FILE *fp;
+		fp = fopen("client_received_file","w+");
+		while(a<= file_size)
+		{
+			a += buff_size;
+			num_put = a-file_size;
+			if (num_put > 0)
+			{
+				buff_size = (a-buff_size)-file_size;
+			}
+			printf("put byte size %i\n", buff_size);
+			nbytes = recvfrom(sock, (char *)buffer, buff_size,
+		                MSG_WAITALL, ( struct sockaddr *) &remote,
+		                &remote_length);
+			printf("received bytes %i\n",nbytes);
+			if(fwrite(buffer,1,nbytes,fp)<0)
+    			{
+      				perror("error writting file");
+    			}
+		}
+		printf("File received...\n");
+		fclose(fp);
 	}
 	else if (strncmp(buffer, "delete", 3) == 0)
 	{
@@ -146,16 +176,51 @@ int main (int argc, char * argv[] )
 
 		// Get file size
   		fseek(fd,0,SEEK_END);
-  		size_t file_size = ftell(fd);
+  		size_t file_size_ls = ftell(fd);
   		fseek(fd,0,SEEK_SET);
 
-
 		// Copy data from the file into a buffer to transmit it to the client
-  		size_t fr = fread(data_buffer,file_size,1,fd);
+  		size_t fr = fread(data_buffer,file_size_ls,1,fd);
 		if (fr<=0)
     		{
       			perror("fread failed\n");
     		}
+		printf("%ld\n",file_size_ls);
+
+		// Copy data from the file into a buffer to transmit it to the client
+		char file_size_str[100];
+		sprintf(file_size_str,"%ld", file_size_ls);
+		strcpy(data_buffer,file_size_str);
+		nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
+        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+            			remote_length);
+		printf("nbytes %i\n", nbytes);
+		file_size = atoi(data_buffer);
+
+		while(a <= file_size_ls)
+		{
+			a += buff_size;
+			int num = a - file_size_ls;
+			if (num > 0)
+			{
+				printf("In while loop...%ld\n",(a-file_size_ls));
+				buff_size = file_size_ls - (a-buff_size);
+			}
+			printf("buff size %i\n", buff_size);
+			fr = fread(data_buffer,buff_size,1,fd);
+			if (fr<0)
+    			{
+      				perror("fread failed\n");
+    			}
+
+			nbytes = sendto(sock, (const char *)data_buffer, buff_size,
+        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+            			remote_length);
+
+			printf(" send bytes %i\n",nbytes);
+		}
+
+		printf("File sent...\n");
 		fclose(fd);
 
 	}
@@ -167,13 +232,6 @@ int main (int argc, char * argv[] )
 	}
 	else printf("Incorrect command entered, do nothing.\n");
 
-	/*while(a <= sizeof(data_buffer))
-	{
-	a += MAXBUFSIZE;
-	nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
-        			MSG_CONFIRM, (const struct sockaddr *) &remote,
-            			remote_length);
-	}*/
 	printf("Message sent from server\n");
 
 	close(sock);
