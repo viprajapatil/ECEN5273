@@ -16,7 +16,6 @@
 
 typedef struct message
 {
-	int status;
 	int sequence;
 	char data[100];
 }msg;
@@ -31,10 +30,11 @@ int main (int argc, char * argv[])
 	long int a = 0;
 	struct sockaddr_in remote;              //"Internet socket address structure"
 	int buff_size = 100;
-  int file_size;
+ 	int file_size;
 	char data_buffer[1024*1024*4];
 
-	msg msg_struct;
+	msg *msg_struct = malloc(sizeof(struct message));
+	int seq = 0;
 
 	if (argc < 3)
 	{
@@ -88,21 +88,28 @@ int main (int argc, char * argv[])
 
 		file_size = atoi(buffer);
 
+		// Calculate count for sequence numbers
+		int sequence_count = (file_size/buff_size)+1;
+
 		FILE *fp;
 		fp = fopen("server_received_file","w+");
 		while(a<= file_size)
 		{
+			seq +=1;
+			// Put sequence number and data in a struct
+			msg_struct->sequence = seq;
+
 			a += buff_size;
 			if (a%file_size < buff_size)
 			{
 				buff_size = a%file_size;
 			}
 
-			nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+			nbytes = recvfrom(sock, msg_struct, sizeof(*msg_struct),
                 		0, (struct sockaddr *)&from_addr,
                 		&addr_length);
 			printf("received nbytes %i\n",nbytes);
-			if(fwrite(buffer,1,nbytes,fp)<0)
+			if(fwrite(msg_struct->data,1,nbytes,fp)<0)
     			{
       				perror("error writting file");
     			}

@@ -17,7 +17,6 @@
 
 typedef struct message
 {
-	int status;
 	int sequence;
 	char data[100];
 }msg;
@@ -34,7 +33,7 @@ int main (int argc, char * argv[] )
 	size_t file_size;
 
 	msg msg_struct;
-	int sequence_num = 0;
+	int seq = 0;
 
 	if (argc != 2)
 	{
@@ -97,7 +96,7 @@ int main (int argc, char * argv[] )
   		fseek(fd,0,SEEK_SET);
 
 		// Copy data from the file into a buffer to transmit it to the client
-  		size_t fr;
+		size_t fr;
 		char file_size_str[100];
 		sprintf(file_size_str,"%ld", file_size);
 		strcpy(data_buffer,file_size_str);
@@ -107,6 +106,12 @@ int main (int argc, char * argv[] )
 
 		file_size = atoi(data_buffer);
 
+    // Get sequence number count 
+    int seq_count = (file_size/buff_size)+1;
+
+    // Increment sequence number after every successful transfer
+    seq += 1;
+    
 		while(a <= file_size)
 		{
 			sleep(0.1);
@@ -125,10 +130,14 @@ int main (int argc, char * argv[] )
     			}
 
 			//store sequence number, status and data in a struct and send it.
-			msg_struct.sequence = sequence_num;
-			nbytes = sendto(sock, (const char *)data_buffer, buff_size,
+			msg_struct.sequence = seq;
+      memcpy(msg_struct->data,data_buffer,sizeof(data_buffer));
+      printf("memcpy done\n");
+			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct)+1024,
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
+                  
+     
 		}
 
 		printf("File sent...\n");
