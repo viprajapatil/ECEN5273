@@ -97,10 +97,8 @@ int main (int argc, char * argv[])
 		fp = fopen("server_received_file","w+");
 		while(a<= file_size)
 		{
-			seq +=1;
-
 			// Put sequence number and data in a struct
-			msg_struct->sequence = seq;
+		//	msg_struct->sequence = seq;
 
 			rec_size =  sizeof(*msg_struct);
 			a += buff_size;
@@ -114,15 +112,20 @@ int main (int argc, char * argv[])
 			nbytes = recvfrom(sock, msg_struct, rec_size,
                 		0, (struct sockaddr *)&from_addr,
                 		&addr_length);
-			printf("buff %i\n", buff_size);
+			/*printf("buff %i\n", buff_size);
 			printf("received nbytes %i\n",nbytes);
 			printf("received data %s\n", msg_struct->data);
-			printf("*************************************************8\n");
+			printf("*************************************************8\n");*/
+
+			// Reliability protocol
+			
+
+
 			if(fwrite(msg_struct->data,1,buff_size,fp)<0)
     			{
       				perror("error writting file");
     			}
-
+				printf("sequence number %ld\n", msg_struct->sequence);
 		}
 			printf("File received...\n");
 		fclose(fp);
