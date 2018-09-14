@@ -16,7 +16,7 @@
 
 typedef struct message
 {
-	int sequence;
+	long int sequence;
 	char data[100];
 }msg;
 
@@ -32,6 +32,8 @@ int main (int argc, char * argv[])
 	int buff_size = 100;
  	int file_size;
 	char data_buffer[1024*1024*4];
+
+	int rec_size;
 
 	msg *msg_struct = malloc(sizeof(struct message));
 	int seq = 0;
@@ -96,23 +98,31 @@ int main (int argc, char * argv[])
 		while(a<= file_size)
 		{
 			seq +=1;
+
 			// Put sequence number and data in a struct
 			msg_struct->sequence = seq;
 
+			rec_size =  sizeof(*msg_struct);
 			a += buff_size;
 			if (a%file_size < buff_size)
 			{
-				buff_size = a%file_size;
+				buff_size = file_size - (a-buff_size);
+				rec_size = buff_size+8;
+				memset(msg_struct->data, 0, sizeof(msg_struct->data));
 			}
 
-			nbytes = recvfrom(sock, msg_struct, sizeof(*msg_struct),
+			nbytes = recvfrom(sock, msg_struct, rec_size,
                 		0, (struct sockaddr *)&from_addr,
                 		&addr_length);
+			printf("buff %i\n", buff_size);
 			printf("received nbytes %i\n",nbytes);
-			if(fwrite(msg_struct->data,1,nbytes,fp)<0)
+			printf("received data %s\n", msg_struct->data);
+			printf("*************************************************8\n");
+			if(fwrite(msg_struct->data,1,buff_size,fp)<0)
     			{
       				perror("error writting file");
     			}
+
 		}
 			printf("File received...\n");
 		fclose(fp);
