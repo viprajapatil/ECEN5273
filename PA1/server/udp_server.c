@@ -17,7 +17,7 @@
 
 typedef struct message
 {
-	int sequence;
+	long int sequence;
 	char data[100];
 }msg;
 
@@ -106,12 +106,12 @@ int main (int argc, char * argv[] )
 
 		file_size = atoi(data_buffer);
 
-    // Get sequence number count 
+    // Get sequence number count
     int seq_count = (file_size/buff_size)+1;
 
     // Increment sequence number after every successful transfer
     seq += 1;
-    
+
 		while(a <= file_size)
 		{
 			sleep(0.1);
@@ -131,13 +131,13 @@ int main (int argc, char * argv[] )
 
 			//store sequence number, status and data in a struct and send it.
 			msg_struct.sequence = seq;
-      memcpy(msg_struct->data,data_buffer,sizeof(data_buffer));
-      printf("memcpy done\n");
-			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct)+1024,
+      memcpy(msg_struct.data,data_buffer,sizeof(data_buffer));
+			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
-                  
-     
+			printf("send nbytes %i\n", nbytes);
+			printf("send data %s\n", msg_struct.data);
+			printf("**************************************************\n");
 		}
 
 		printf("File sent...\n");
@@ -155,7 +155,7 @@ int main (int argc, char * argv[] )
 		int num_put;
 		FILE *fp;
 		fp = fopen("client_received_file","w+");
-		
+
 		while(a<= file_size)
 		{
 			a += buff_size;
