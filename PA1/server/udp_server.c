@@ -110,11 +110,11 @@ int main (int argc, char * argv[] )
     int seq_count = (file_size/buff_size)+1;
 
     // Increment sequence number after every successful transfer
-    seq += 1;
 
 		while(a <= file_size)
 		{
 			sleep(0.1);
+			seq += 1;
 			a += buff_size;
 			int num = a - file_size;
 			if (num > 0)
@@ -122,7 +122,7 @@ int main (int argc, char * argv[] )
 				printf("In while loop...%ld\n",(a-file_size));
 				buff_size = file_size - (a-buff_size);
 			}
-			printf("buff size %i\n", buff_size);
+			//printf("buff size %i\n", buff_size);
 			fr = fread(data_buffer,buff_size,1,fd);
 			if (fr<0)
     			{
@@ -135,9 +135,10 @@ int main (int argc, char * argv[] )
 			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
-			printf("send nbytes %i\n", nbytes);
+			/*printf("send nbytes %i\n", nbytes);
 			printf("send data %s\n", msg_struct.data);
-			printf("**************************************************\n");
+			printf("**************************************************\n");*/
+			printf("send sequence number %ld\n", msg_struct.sequence);
 		}
 
 		printf("File sent...\n");
