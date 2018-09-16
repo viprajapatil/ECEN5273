@@ -45,6 +45,7 @@ int main (int argc, char * argv[] )
 
 	msg msg_struct;
 	ack_struct msg_struct_ack;
+	int rec_size;
 
 	int seq = 0;
 
@@ -182,24 +183,62 @@ int main (int argc, char * argv[] )
 
 		while(a<= file_size)
 		{
+			seq +=1;
 			a += buff_size;
 			num_put = a-file_size;
+			rec_size =  sizeof(msg_struct);
 			if (num_put > 0)
 			{
 				printf("entered the loop...%i\n",num_put);
-				buff_size = (a-buff_size)-file_size;
+				buff_size = file_size-(a-buff_size);
+				rec_size = buff_size+8;
+				memset(msg_struct.data, 0, sizeof(msg_struct.data));
 			}
 			printf("a %i\n", a);
 			printf("buff_size %i\n", buff_size);
 
-			nbytes = recvfrom(sock, (char *)buffer, buff_size,
+			nbytes = recvfrom(sock, &msg_struct, rec_size,
 		                MSG_WAITALL, ( struct sockaddr *) &remote,
 		                &remote_length);
 			printf("received nbytes %i\n", nbytes);
-			if(fwrite(buffer,1,nbytes,fp)<0)
-    			{
-      				perror("error writting file");
-    			}
+
+			if (nbytes == -1)
+						{
+							msg_struct_ack.sequence = msg_struct.sequence;
+				  		msg_struct_ack.status = NOT_RECEIVED;
+							printf("sent ack msg %i\n", msg_struct_ack.status);
+						}
+						else
+						{
+							msg_struct_ack.sequence = msg_struct.sequence;
+				  		msg_struct_ack.status = RECEIVED;
+							printf("sent ack msg %i\n", msg_struct_ack.status);
+						}
+
+			// Reliability protocol
+			/*msg_struct_ack.sequence = msg_struct.sequence;
+			msg_struct_ack.status = RECEIVED;
+			printf("sent ack msg %i\n", msg_struct_ack.status);*/
+			nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
+									        	MSG_CONFIRM, (const struct sockaddr *) &remote,
+							            			remote_length);
+
+			if (msg_struct_ack.status == NOT_RECEIVED)
+			{
+				nbytes = recvfrom(sock,&msg_struct, rec_size,
+										0, ( struct sockaddr *) &remote,
+		                &remote_length);
+			}
+			if (msg_struct_ack.status == RECEIVED | nbytes == 0)
+			{
+					printf("entered fwrite loop...\n");
+					if(fwrite(msg_struct.data,1,buff_size,fp)<0)
+						{
+								perror("error writting file");
+						}
+					printf("sequence number %ld\n", msg_struct.sequence);
+			}
+
 		}
 		printf("File received...\n");
 		fclose(fp);
@@ -216,7 +255,6 @@ int main (int argc, char * argv[] )
 	}
 	else if (strcmp(buffer, "ls") == 0)
 	{
-		seq = 1;
 		FILE *fls = popen("ls>ls_op.txt", "r");
 		sleep(1);
 		FILE *fd = fopen("ls_op.txt","r");
