@@ -169,6 +169,7 @@ int main (int argc, char * argv[])
       					perror("error writting file");
     				}
 				printf("sequence number %ld\n", msg_struct.sequence);
+				printf("data written %s\n", msg_struct.data);
 			}
 
 		}
@@ -203,6 +204,7 @@ int main (int argc, char * argv[])
 		while(a <= file_size_put)
 		{
 			sleep(0.1);
+			seq += 1;
 			a += buff_size;
 			int num = a - file_size_put;
 			if (num > 0)
@@ -217,9 +219,29 @@ int main (int argc, char * argv[])
       				perror("fread failed\n");
     			}
 
-			nbytes = sendto(sock, (const char *)data_buffer, buff_size,
+			//store sequence number, status and data in a struct and send it.
+			msg_struct.sequence = seq;
+			memcpy(msg_struct.data,data_buffer,sizeof(data_buffer));
+			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			sizeof(remote));
+			printf("send sequence number %ld\n", msg_struct.sequence);
+			printf("send nbytes %i\n", nbytes);
+
+			// Reliability protocol
+			nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
+					                MSG_WAITALL, (struct sockaddr *)&from_addr,
+													&addr_length);
+			printf("received ack seq %ld\n", msg_struct_ack.sequence);
+			printf("received ack msg %i\n", msg_struct_ack.status);
+			if ((msg_struct_ack.sequence != seq) | ( msg_struct_ack.status != RECEIVED))
+			{
+				nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+				        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+				            		sizeof(remote));
+			}
+
+
 		}
 	}
 	else
