@@ -47,8 +47,8 @@ int main (int argc, char * argv[])
 
 	int rec_size;
 
-	msg *msg_struct = malloc(sizeof(struct message));
-	ack_struct *msg_struct_ack = malloc(sizeof(struct ack));
+	msg msg_struct;
+	ack_struct msg_struct_ack;
 
 	int seq = 0;
 
@@ -115,60 +115,60 @@ int main (int argc, char * argv[])
 		{
 			printf("enter loop...\n");
 			// Put sequence number and data in a struct
-		//	msg_struct->sequence = seq;
-			printf("\nreceived file size is %d\n",file_size);
-			rec_size =  sizeof(*msg_struct);
+		//	msg_struct.sequence = seq;
+
+			rec_size =  sizeof(msg_struct);
 			a += buff_size;
 			if (a%file_size < buff_size)
 			{
 				buff_size = file_size - (a-buff_size);
 				rec_size = buff_size+8;
-				memset(msg_struct->data, 0, sizeof(msg_struct->data));
+				memset(msg_struct.data, 0, sizeof(msg_struct.data));
 			}
 
-			nbytes = recvfrom(sock, msg_struct, rec_size,
+			nbytes = recvfrom(sock,&msg_struct, rec_size,
                 		0, (struct sockaddr *)&from_addr,
                 		&addr_length);
 
 			if (nbytes == -1)
 			{
-				msg_struct_ack->sequence = msg_struct->sequence;
-	  		msg_struct_ack->status = NOT_RECEIVED;
-				printf("sent ack msg %i\n", msg_struct_ack->status);
+				msg_struct_ack.sequence = msg_struct.sequence;
+	  		msg_struct_ack.status = NOT_RECEIVED;
+				printf("sent ack msg %i\n", msg_struct_ack.status);
 			}
 			else
 			{
-				msg_struct_ack->sequence = msg_struct->sequence;
-	  		msg_struct_ack->status = RECEIVED;
-				printf("sent ack msg %i\n", msg_struct_ack->status);
+				msg_struct_ack.sequence = msg_struct.sequence;
+	  		msg_struct_ack.status = RECEIVED;
+				printf("sent ack msg %i\n", msg_struct_ack.status);
 			}
 			/*printf("buff %i\n", buff_size);
 			printf("received nbytes %i\n",nbytes);
-			printf("received data %s\n", msg_struct->data);
+			printf("received data %s\n", msg_struct.data);
 			printf("*************************************************8\n");*/
 
 			// Reliability protocol
-			/*msg_struct_ack->sequence = msg_struct->sequence;
-  		msg_struct_ack->status = RECEIVED;
-			printf("sent ack msg %i\n", msg_struct_ack->status);*/
-			nbytes = sendto(sock, msg_struct_ack, sizeof(msg_struct_ack),
+			/*msg_struct_ack.sequence = msg_struct.sequence;
+  		msg_struct_ack.status = RECEIVED;
+			printf("sent ack msg %i\n", msg_struct_ack.status);*/
+			nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
 			        	MSG_CONFIRM, (const struct sockaddr *) &remote,
 			            	sizeof(remote));
 
-			if (msg_struct_ack->status == NOT_RECEIVED)
+			if (msg_struct_ack.status == NOT_RECEIVED)
 			{
-				nbytes = recvfrom(sock, msg_struct, rec_size,
+				nbytes = recvfrom(sock,&msg_struct, rec_size,
 											0, (struct sockaddr *)&from_addr,
 											&addr_length);
 			}
-			if (msg_struct_ack->status == RECEIVED | nbytes == 0)
+			if (msg_struct_ack.status == RECEIVED | nbytes == 0)
 			{
 				printf("entered fwrite loop...\n");
-				if(fwrite(msg_struct->data,1,rec_size,fp)<0)
+				if(fwrite(msg_struct.data,1,buff_size,fp)<0)
     				{
       					perror("error writting file");
     				}
-				printf("sequence number %ld\n", msg_struct->sequence);
+				printf("sequence number %ld\n", msg_struct.sequence);
 			}
 
 		}
