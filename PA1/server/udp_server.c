@@ -15,11 +15,22 @@
 
 #define MAXBUFSIZE 512
 
+enum status{
+	RECEIVED = 0,
+	NOT_RECEIVED = 1
+};
+
 typedef struct message
 {
 	long int sequence;
-	char data[100];
+	char data[512];
 }msg;
+
+typedef struct ack
+{
+	long int sequence;
+	int status;
+}ack_struct;
 
 int main (int argc, char * argv[] )
 {
@@ -28,11 +39,13 @@ int main (int argc, char * argv[] )
 	unsigned int remote_length;         //length of the sockaddr_in structure
 	int nbytes;                        //number of bytes we receive in our message
 	char buffer[MAXBUFSIZE];             //a buffer to store our received message
-	int buff_size = 100;
+	int buff_size = 512;
 	int a = 0;
 	size_t file_size;
 
 	msg msg_struct;
+	ack_struct msg_struct_ack;
+
 	int seq = 0;
 
 	if (argc != 2)
@@ -57,6 +70,9 @@ int main (int argc, char * argv[] )
 		perror("unable to create socket");
 	}
 
+	int optval = 1;
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+				 (const void *)&optval , sizeof(int));
 
 	/******************
 	  Once we've created a socket, we must bind that socket to the
@@ -139,6 +155,20 @@ int main (int argc, char * argv[] )
 			printf("send data %s\n", msg_struct.data);
 			printf("**************************************************\n");*/
 			printf("send sequence number %ld\n", msg_struct.sequence);
+
+			// Reliability protocol
+			nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
+		                MSG_WAITALL, ( struct sockaddr *) &remote,
+		                &remote_length);
+			printf("received ack seq %ld\n", msg_struct_ack.sequence);
+			printf("received ack msg %i\n", msg_struct_ack.status);
+			if ((msg_struct_ack.sequence != seq) | ( msg_struct_ack.status != RECEIVED))
+			{
+				nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+	        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+	            			remote_length);
+			}
+
 		}
 
 		printf("File sent...\n");
