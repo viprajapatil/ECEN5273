@@ -116,7 +116,7 @@ int main (int argc, char * argv[])
 			printf("enter loop...\n");
 			// Put sequence number and data in a struct
 		//	msg_struct->sequence = seq;
-
+			printf("\nreceived file size is %d\n",file_size);
 			rec_size =  sizeof(*msg_struct);
 			a += buff_size;
 			if (a%file_size < buff_size)
@@ -164,7 +164,7 @@ int main (int argc, char * argv[])
 			if (msg_struct_ack->status == RECEIVED | nbytes == 0)
 			{
 				printf("entered fwrite loop...\n");
-				if(fwrite(msg_struct->data,1,buff_size,fp)<0)
+				if(fwrite(msg_struct->data,1,rec_size,fp)<0)
     				{
       					perror("error writting file");
     				}
