@@ -236,19 +236,13 @@ int main (int argc, char * argv[] )
   		size_t file_size_ls = ftell(fd);
   		fseek(fd,0,SEEK_SET);
 
-		// Copy data from the file into a buffer to transmit it to the client
-  		size_t fr = fread(data_buffer,file_size_ls,1,fd);
-		if (fr<0)
-    		{
-      			perror("fread failed\n");
-    		}
-		printf("%ld\n",file_size_ls);
-
+	 size_t fr = 0;
 		// Copy data from the file into a buffer to transmit it to the client
 		char file_size_str[100];
 		sprintf(file_size_str,"%ld", file_size_ls);
 		strcpy(data_buffer,file_size_str);
-		nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
+
+	 	nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
 		file_size = atoi(data_buffer);
@@ -269,9 +263,16 @@ int main (int argc, char * argv[] )
       				perror("fread failed\n");
     			}
 
-			nbytes = sendto(sock, (const char *)data_buffer, buff_size,
+			//debug print
+			//printf("\ndata_buffer[file content]\n %s\n data buffer address is %ld\n",data_buffer,&data_buffer);
+			/*nbytes = sendto(sock, (const char *)data_buffer, buff_size,
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
-            			remote_length);
+            			remote_length);*/
+			msg_struct.sequence = seq;
+			memcpy(msg_struct.data,data_buffer,sizeof(data_buffer));
+			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+						        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+						            			remote_length);
 		}
 
 		printf("File sent...\n");
