@@ -48,7 +48,7 @@ int main (int argc, char * argv[])
 
 	struct timeval tv;
 tv.tv_sec = 1;
-tv.tv_usec = 000000;
+tv.tv_usec = 0;
 
 	int rec_size;
 
@@ -119,17 +119,16 @@ tv.tv_usec = 000000;
 		{
 
 			seq += 1;
-			printf("enter loop...\n");
+			//printf("enter loop...\n");
 
-		printf("seq %i seq num %ld ack seq num %ld\n", seq, msg_struct.sequence, msg_struct_ack.sequence);
+	//	printf("seq %i seq num %ld ack seq num %ld\n", seq, msg_struct.sequence, msg_struct_ack.sequence);
 			rec_size =  sizeof(msg_struct);
 			if (count_flag  == 0)
 			{
-				printf("count %i\n", sequence_count);
+				//printf("count %i\n", sequence_count);
 					a += buff_size;
 			}
 
-								printf("a %ld t %ld\n", a, count_flag);
 			if (a%file_size < buff_size)
 			{
 				buff_size = file_size - (a-buff_size);
@@ -140,10 +139,11 @@ tv.tv_usec = 000000;
 			nbytes = recvfrom(sock,&msg_struct, rec_size,
                 		MSG_WAITALL, (struct sockaddr *)&from_addr,
                 		&addr_length);
-		  printf("nbytes recived %i\n", nbytes);
+		  //printf("nbytes recived %i\n", nbytes);
+			printf("Receiving file...\n");
 			while (nbytes == -1)
 			{
-				printf("send bytes not recived...\n");
+			//	printf("send bytes not recived...\n");
 				msg_struct_ack.sequence = msg_struct.sequence;
 				msg_struct_ack.status = NOT_RECEIVED;
 				printf("sent ack msg %i\n", msg_struct_ack.status);
@@ -166,18 +166,17 @@ tv.tv_usec = 000000;
 										MSG_CONFIRM, (const struct sockaddr *) &remote,
 												sizeof(remote));
 				}
-				else printf("entered NACK loop...\n");
+
 
 			if (msg_struct_ack.status == RECEIVED)
 			{
 				count_flag = 0;
-				printf("entered fwrite loop...\n");
 				if(fwrite(msg_struct.data,1,buff_size,fp)<0)
     				{
       					perror("error writting file");
     				}
 						else sequence_count -= 1;
-				printf("sequence number %ld\n", msg_struct.sequence);
+			//	printf("sequence number %ld\n", msg_struct.sequence);
 
 			}
 
@@ -198,7 +197,6 @@ tv.tv_usec = 000000;
   		fseek(fd,0,SEEK_END);
   		size_t file_size_put = ftell(fd);
   		fseek(fd,0,SEEK_SET);
-		printf("%ld\n",file_size_put);
 
 		// Copy data from the file into a buffer to transmit it to the client
   		size_t fr;
@@ -208,11 +206,9 @@ tv.tv_usec = 000000;
 		nbytes = sendto(sock, (const char *)data_buffer, strlen(data_buffer),
 		        	MSG_CONFIRM, (const struct sockaddr *) &remote,
 		            	sizeof(remote));
-		printf("file size %s\n", data_buffer);
 
 		while(a <= file_size_put)
 		{
-			sleep(0.1);
 			seq += 1;
 			a += buff_size;
 			int num = a - file_size_put;
@@ -235,7 +231,6 @@ tv.tv_usec = 000000;
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			sizeof(remote));
 			printf("send sequence number %ld\n", msg_struct.sequence);
-			printf("send nbytes %i\n", nbytes);
 
 			// Reliability protocol
 			nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
@@ -243,13 +238,29 @@ tv.tv_usec = 000000;
 													&addr_length);
 			printf("received ack seq %ld\n", msg_struct_ack.sequence);
 			printf("received ack msg %i\n", msg_struct_ack.status);
-			if ((msg_struct_ack.sequence != seq) | ( msg_struct_ack.status != RECEIVED))
-			{
-				nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
-				        			MSG_CONFIRM, (const struct sockaddr *) &remote,
-				            		sizeof(remote));
-			}
 
+			while (nbytes == -1) {
+				printf("nbytes %i\n", nbytes);
+				printf("received ack seq %ld\n", msg_struct_ack.sequence);
+				printf("received ack msg %i\n", msg_struct_ack.status);
+				while (nbytes == -1) {
+					nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+												MSG_WAITALL, (struct sockaddr *) &from_addr,
+												&addr_length);
+					printf("nbytes after timeout %i\n", nbytes);
+				}
+				printf("received ack seq %ld\n", msg_struct_ack.sequence);
+				printf("received ack msg %i\n", msg_struct_ack.status);
+				if ((msg_struct_ack.sequence!= seq) | (msg_struct_ack.status != RECEIVED)) {
+					nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+												MSG_CONFIRM, (const struct sockaddr *) &remote,
+													sizeof(remote));
+					printf("resending data \n");
+				}
+				nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+											MSG_WAITALL, (struct sockaddr *) &from_addr,
+											&addr_length);
+			}
 
 		}
 	}
