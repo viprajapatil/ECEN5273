@@ -113,10 +113,10 @@ int main (int argc, char * argv[])
 
 		file_size = atoi(buffer);
 		printf("file size %s\n",buffer);
-		/*if (file_size == 0){
+		if (file_size == 0){
 			printf("File does not exist...\n");
 			exit(0);
-		}*/
+		}
 		// Calculate count for sequence numbers
 		int sequence_count = (file_size/buff_size);
 
