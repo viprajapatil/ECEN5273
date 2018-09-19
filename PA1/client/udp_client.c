@@ -93,7 +93,6 @@ int main (int argc, char * argv[])
 	nbytes = sendto(sock, (const char *)command, strlen(command),
         	MSG_CONFIRM, (const struct sockaddr *) &remote,
             	sizeof(remote));
-	printf("Message sent from Client\n");
 
 	// Blocks till bytes are received
 	struct sockaddr_in from_addr;
@@ -103,12 +102,21 @@ int main (int argc, char * argv[])
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
 
 	if ((strcmp(command, "ls") == 0)|(strncmp(command, "get", 3) == 0)){
+
+		if (strcmp(command, "ls") == 0) {
+			sleep(1);
+		}
+
 		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
 									MSG_WAITALL, (struct sockaddr *) &from_addr,
 									&addr_length);
 
 		file_size = atoi(buffer);
-
+		printf("file size %s\n",buffer);
+		/*if (file_size == 0){
+			printf("File does not exist...\n");
+			exit(0);
+		}*/
 		// Calculate count for sequence numbers
 		int sequence_count = (file_size/buff_size);
 
@@ -160,6 +168,7 @@ int main (int argc, char * argv[])
 				count_flag = 0;
 				if(fwrite(msg_struct.data,1,buff_size,fp)<0){
       					perror("error writting file");
+								exit(1);
     				}
 						else sequence_count -= 1;
 			}
@@ -173,6 +182,11 @@ int main (int argc, char * argv[])
 		FILE *fd = fopen(ret+1,"r");
   	if(fd==NULL){
       	perror("fopen failed\n");
+				strcpy(data_buffer, "File does not exist");
+				nbytes = sendto(sock, (const char *)data_buffer, strlen(data_buffer),
+				        	MSG_CONFIRM, (const struct sockaddr *) &remote,
+				            	sizeof(remote));
+				exit(1);
     	}
 
 		// Get file size
@@ -202,6 +216,7 @@ int main (int argc, char * argv[])
 			fr = fread(data_buffer,buff_size,1,fd);
 			if (fr<0){
       		perror("fread failed\n");
+					exit(1);
 				}
 
 			//store sequence number, status and data in a struct and send it.
@@ -246,4 +261,3 @@ int main (int argc, char * argv[])
 	close(sock);
 //}
 }
-
