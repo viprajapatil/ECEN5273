@@ -23,7 +23,7 @@ enum status{
 typedef struct message
 {
 	long int sequence;
-	char data[512];
+	char data[1024];
 }msg;
 
 typedef struct ack
@@ -39,9 +39,13 @@ int main (int argc, char * argv[] )
 	unsigned int remote_length;         //length of the sockaddr_in structure
 	int nbytes;                        //number of bytes we receive in our message
 	char buffer[MAXBUFSIZE];             //a buffer to store our received message
-	int buff_size = 512;
+	int buff_size = 1024;
 	int a = 0;
 	size_t file_size;
+
+	struct timeval tv;
+tv.tv_sec = 1;
+tv.tv_usec = 000000;
 
 	msg msg_struct;
 	ack_struct msg_struct_ack;
@@ -72,8 +76,7 @@ int main (int argc, char * argv[] )
 	}
 
 	int optval = 1;
-	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-				 (const void *)&optval , sizeof(int));
+
 
 	/******************
 	  Once we've created a socket, we must bind that socket to the
@@ -94,6 +97,7 @@ int main (int argc, char * argv[] )
 
 	printf("The client says %s\n", buffer);
 
+	setsockopt(sock, SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
 	// Buffer to store data to be sent to the client
 	char data_buffer[1024*1024*4];
 
@@ -123,9 +127,10 @@ int main (int argc, char * argv[] )
 
 		while(a <= file_size)
 		{
-			sleep(0.1);
+
 			seq += 1;
 			a += buff_size;
+			printf("a %i\n", a);
 			int num = a - file_size;
 			if (num > 0)
 			{
@@ -150,18 +155,39 @@ int main (int argc, char * argv[] )
 			printf("**************************************************\n");*/
 			printf("send sequence number %ld\n", msg_struct.sequence);
 
-			// Reliability protocol
 			nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
 		                MSG_WAITALL, ( struct sockaddr *) &remote,
 		                &remote_length);
+										printf("received ack seq %ld\n", msg_struct_ack.sequence);
+										printf("received ack msg %i\n", msg_struct_ack.status);
+
+			while (nbytes == -1)
+			{// Reliability protocol
+			printf("nbytes %i\n", nbytes);
 			printf("received ack seq %ld\n", msg_struct_ack.sequence);
 			printf("received ack msg %i\n", msg_struct_ack.status);
-			if ((msg_struct_ack.sequence != seq) | ( msg_struct_ack.status != RECEIVED))
+			while (nbytes == -1)
 			{
-				nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
-	        			MSG_CONFIRM, (const struct sockaddr *) &remote,
-	            			remote_length);
+				nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
+			                MSG_WAITALL, ( struct sockaddr *) &remote,
+			                &remote_length);
+				printf("nbytes after timeout %i\n", nbytes);
 			}
+
+				printf("received ack seq %ld\n", msg_struct_ack.sequence);
+				printf("received ack msg %i\n", msg_struct_ack.status);
+				if ((msg_struct_ack.sequence != seq) | ( msg_struct_ack.status != RECEIVED))
+				{
+					nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+		        			MSG_CONFIRM, (const struct sockaddr *) &remote,
+		            			remote_length);
+											printf("resending data \n");
+				}
+				nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
+			                MSG_WAITALL, ( struct sockaddr *) &remote,
+			                &remote_length);
+			}
+
 
 		}
 
