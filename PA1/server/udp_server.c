@@ -45,13 +45,14 @@ int main (int argc, char * argv[] )
 
 	struct timeval tv;
 tv.tv_sec = 1;
-tv.tv_usec = 000000;
+tv.tv_usec = 0;
 
 	msg msg_struct;
 	ack_struct msg_struct_ack;
 	int rec_size;
 
 	int seq = 0;
+	int count_flag = 0;
 
 	if (argc != 2)
 	{
@@ -127,10 +128,8 @@ tv.tv_usec = 000000;
 
 		while(a <= file_size)
 		{
-
 			seq += 1;
 			a += buff_size;
-			printf("a %i\n", a);
 			int num = a - file_size;
 			if (num > 0)
 			{
@@ -202,17 +201,25 @@ tv.tv_usec = 000000;
 	                &remote_length);
 
 		file_size = atoi(buffer);
-		printf("file size %ld\n", file_size);
+		int sequence_count = (file_size/buff_size);
+
 		int num_put;
 		FILE *fp;
 		fp = fopen("client_received_file","w+");
 
-		while(a<= file_size)
+		while(sequence_count >= 0)
 		{
 			seq +=1;
-			a += buff_size;
-			num_put = a-file_size;
 			rec_size =  sizeof(msg_struct);
+
+			if (count_flag == 0)
+			{
+				printf("count %i\n", sequence_count);
+				a += buff_size;
+			}
+
+			num_put = a-file_size;
+
 			if (num_put > 0)
 			{
 				printf("entered the loop...%i\n",num_put);
@@ -220,48 +227,46 @@ tv.tv_usec = 000000;
 				rec_size = buff_size+8;
 				memset(msg_struct.data, 0, sizeof(msg_struct.data));
 			}
-			printf("a %i\n", a);
-			printf("buff_size %i\n", buff_size);
 
 			nbytes = recvfrom(sock, &msg_struct, rec_size,
 		                MSG_WAITALL, ( struct sockaddr *) &remote,
 		                &remote_length);
-			printf("received nbytes %i\n", nbytes);
+			printf("Receiving file...\n");
 
-			if (nbytes == -1)
+			while (nbytes == -1)
 						{
 							msg_struct_ack.sequence = msg_struct.sequence;
 				  		msg_struct_ack.status = NOT_RECEIVED;
 							printf("sent ack msg %i\n", msg_struct_ack.status);
+							count_flag = 1;
+							nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
+													        	MSG_CONFIRM, (const struct sockaddr *) &remote,
+											            			remote_length);
+
+							nbytes = recvfrom(sock,&msg_struct, rec_size,
+																										0, ( struct sockaddr *) &remote,
+																		                &remote_length);
 						}
-						else
+
+
+						if (nbytes >= 0)
 						{
 							msg_struct_ack.sequence = msg_struct.sequence;
 				  		msg_struct_ack.status = RECEIVED;
-							printf("sent ack msg %i\n", msg_struct_ack.status);
+							count_flag = 0;
+							nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
+																		MSG_CONFIRM, (const struct sockaddr *) &remote,
+																				remote_length);
 						}
 
-			// Reliability protocol
-			/*msg_struct_ack.sequence = msg_struct.sequence;
-			msg_struct_ack.status = RECEIVED;
-			printf("sent ack msg %i\n", msg_struct_ack.status);*/
-			nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
-									        	MSG_CONFIRM, (const struct sockaddr *) &remote,
-							            			remote_length);
-
-			if (msg_struct_ack.status == NOT_RECEIVED)
+			if (msg_struct_ack.status == RECEIVED)
 			{
-				nbytes = recvfrom(sock,&msg_struct, rec_size,
-										0, ( struct sockaddr *) &remote,
-		                &remote_length);
-			}
-			if (msg_struct_ack.status == RECEIVED | nbytes == 0)
-			{
+					count_flag = 0;
 					printf("entered fwrite loop...\n");
 					if(fwrite(msg_struct.data,1,buff_size,fp)<0)
 						{
 								perror("error writting file");
-						}
+						}else sequence_count -= 1;
 					printf("sequence number %ld\n", msg_struct.sequence);
 			}
 
