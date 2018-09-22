@@ -59,11 +59,12 @@ int main (int argc, char * argv[] )
 		printf ("USAGE:  <port>\n");
 		exit(1);
 	}
-//while (1) {
+
 	seq = 0;
 	count_flag = 0;
 	buff_size = 1024;
 	a = 0;
+	nbytes = -1;
 	/******************
 	  This code populates the sockaddr_in struct with
 	  the information about our socket
@@ -90,13 +91,26 @@ int main (int argc, char * argv[] )
 
 	remote_length = sizeof(remote);
 
+	int cnt = 0;
+while(1){
+	seq = 0;
+	count_flag = 0;
+	buff_size = 1024;
+	a = 0;
+	nbytes = -1;
+	printf("entered....\n");
 	//waits for an incoming message
-	bzero(buffer,sizeof(buffer));
-	nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
+	memset(buffer,0,sizeof(buffer));
+	nbytes = -1;
+	while(nbytes == -1)
+	{
+		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
                 MSG_WAITALL, ( struct sockaddr *) &remote,
                 &remote_length);
+	}
 
-	printf("The client says %s\n", buffer);
+
+	printf("The client says %s number of bytes received is %d\n", buffer,nbytes);
 
 	setsockopt(sock, SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
 
@@ -130,8 +144,9 @@ int main (int argc, char * argv[] )
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
 		printf("Sending file...\n");
-
+		int ack_flag = 0;
 		while(a <= file_size){
+			ack_flag = 0;
 			seq += 1;
 			a += buff_size;
 			int num = a - file_size;
@@ -139,6 +154,7 @@ int main (int argc, char * argv[] )
 				buff_size = file_size - (a-buff_size);
 				printf("Almost done!\n");
 			}
+			printf("a %i\n", a);
 			//printf("buff size %i\n", buff_size);
 			fr = fread(data_buffer,buff_size,1,fd);
 			if (fr<0){
@@ -146,17 +162,28 @@ int main (int argc, char * argv[] )
 					exit(1);
     		}
 
+		while(ack_flag == 0)
+		{
+			printf("\nsending file %d\n",seq);
 			//store sequence number, status and data in a struct and send it.
 			msg_struct.sequence = seq;
       memcpy(msg_struct.data,data_buffer,sizeof(data_buffer));
 			nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
         			MSG_CONFIRM, (const struct sockaddr *) &remote,
             			remote_length);
-
 			nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
 		                MSG_WAITALL, ( struct sockaddr *) &remote,
 		                &remote_length);
 
+			if(nbytes > 0)
+			{
+				if((msg_struct_ack.status == RECEIVED) && (msg_struct_ack.sequence == seq) )
+				{
+				 	ack_flag = 1;
+				}
+			}
+	       }
+		/*
 			while (nbytes == -1){
 			// Reliability protocol
 				while (nbytes == -1){
@@ -173,19 +200,25 @@ int main (int argc, char * argv[] )
 				nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
 			                MSG_WAITALL, ( struct sockaddr *) &remote,
 			                &remote_length);
-			}
+			}*/
 		}
 		printf("File sent...\n");
 		fclose(fd);
 
 	}
 	else if (strncmp(buffer, "put", 3) == 0){
+		buff_size = 1024;
+		seq = 0;
+		int flag = 0;
+		a = 0;
+		count_flag = 0;
 		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
 	                MSG_WAITALL, ( struct sockaddr *) &remote,
 	                &remote_length);
 
 		file_size = atoi(buffer);
-
+		printf("file size %i\n", file_size);
+		printf("buff_size %i\n", buff_size);
 		if (file_size == 0){
 			printf("File does not exist...\n");
 			exit(0);
@@ -199,9 +232,11 @@ int main (int argc, char * argv[] )
 
 		while(sequence_count >= 0){
 			seq +=1;
+			flag = 0;
 			rec_size =  sizeof(msg_struct);
 
 			if (count_flag == 0){
+						printf("seq count %i\n", sequence_count);
 				a += buff_size;
 				}
 
@@ -211,11 +246,52 @@ int main (int argc, char * argv[] )
 				rec_size = buff_size+8;
 				memset(msg_struct.data, 0, sizeof(msg_struct.data));
 			}
+			int nbytes1 = 0;
 
-			nbytes = recvfrom(sock, &msg_struct, rec_size,
+			while (flag == 0)
+			{
+				nbytes1 = recvfrom(sock, &msg_struct, rec_size,
+			                MSG_WAITALL, ( struct sockaddr *) &remote,
+			                &remote_length);
+
+				if (nbytes > 0)
+				{
+					if (msg_struct.sequence == seq)
+					{
+					 msg_struct_ack.sequence = msg_struct.sequence;
+					 msg_struct_ack.status = RECEIVED;
+					 nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
+ 														        	MSG_CONFIRM, (const struct sockaddr *) &remote,
+ 												            			remote_length);
+					 if(fwrite(msg_struct.data,1,buff_size,fp)<0)
+					 {
+						 perror("error writting file");
+						 exit(1);
+					 }
+					 else
+					 {
+						 printf("\nNo of bytes written to the file %d and nbytes1 is %d\n",buff_size,nbytes1);
+						 printf("sequence_count %d\n",sequence_count);
+						 sequence_count -= 1;
+						 flag = 1;
+					 }
+					}
+				else
+				{
+					msg_struct_ack.sequence = msg_struct.sequence;
+					msg_struct_ack.status = NOT_RECEIVED;
+					printf("sent ack msg %i\n", msg_struct_ack.status);
+					nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
+																		 MSG_CONFIRM, (const struct sockaddr *) &remote,
+																				 remote_length);
+					printf("\nNACK WRONG PACKET RECEIVED\n");
+				}
+			}
+			else printf("\nTIMEOUT TIMEOUT TIMEOUT\n");
+			/*nbytes = recvfrom(sock, &msg_struct, rec_size,
 		                MSG_WAITALL, ( struct sockaddr *) &remote,
 		                &remote_length);
-			printf("Receiving file...\n");
+			printf("Receiving file... seq no %d\n",msg_struct.sequence);
 
 			while (nbytes == -1){
 				msg_struct_ack.sequence = msg_struct.sequence;
@@ -224,7 +300,7 @@ int main (int argc, char * argv[] )
 				nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
 													        	MSG_CONFIRM, (const struct sockaddr *) &remote,
 											            			remote_length);
-
+				printf("\nsent nack\n");
 				nbytes = recvfrom(sock,&msg_struct, rec_size,
 																										0, ( struct sockaddr *) &remote,
 																		                &remote_length);
@@ -246,11 +322,13 @@ int main (int argc, char * argv[] )
 						exit(1);
 					}
 					else sequence_count -= 1;
-			}
+			}*/
 		}
+	}
 		printf("File received...\n");
 		fclose(fp);
-	}
+
+}
 	else if (strncmp(buffer, "delete", 3) == 0)
 	{
 		char *ret = strchr(buffer, ' ');
@@ -354,7 +432,7 @@ int main (int argc, char * argv[] )
 								remote_length);
 		printf("Incorrect command entered, do nothing.\n");
 	}
-
+}
 	close(sock);
-//}
+
 }
