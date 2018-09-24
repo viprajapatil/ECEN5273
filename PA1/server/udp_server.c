@@ -274,7 +274,7 @@ while(1){
 	 	}
 		memcpy(buffer,msg_struct.data,MAXBUFSIZE);
 		file_size = atoi(buffer);
-
+    printf("file size %i\n", file_size);
 		if (file_size == 0){
 			printf("File does not exist...\n");
 			exit(0);
