@@ -268,11 +268,14 @@ file from the server
 		char *ret = strchr(command, ' ');
 		FILE *fd = fopen(ret+1,"r");
   	if(fd==NULL){
-      	perror("fopen failed\n");
+      	
 				strcpy(data_buffer, "File does not exist");
-				nbytes = sendto(sock, (const char *)data_buffer, strlen(data_buffer),
-				        	MSG_CONFIRM, (const struct sockaddr *) &remote,
-				            	sizeof(remote));
+				msg_struct.sequence = 4;
+		memcpy(msg_struct.data,data_buffer,MAXBUFSIZE);
+		nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+							MSG_CONFIRM, (const struct sockaddr *) &remote,
+									sizeof(remote));
+				perror("fopen failed\n");
 				exit(1);
     	}
 
