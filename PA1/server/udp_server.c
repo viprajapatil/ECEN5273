@@ -1,3 +1,11 @@
+/*
+ * file : udp_server.c
+ * author : Vipraja Patil
+ * description: Server receives commands from client. Reliability
+ * protocol(Stop and wait) has been implemented for efficient transfer of file
+ * between the two nodes.
+*/
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -15,17 +23,20 @@
 
 #define MAXBUFSIZE 100
 
+// Enum defining acknowledgments
 enum status{
 	RECEIVED = 0,
 	NOT_RECEIVED = 1
 };
 
+// Struct which contains sequence number of the packet and data
 typedef struct message
 {
 	long int sequence;
 	char data[1024];
 }msg;
 
+// Struct which contains sequence numebr of the packet and acknowledgment
 typedef struct ack
 {
 	long int sequence;
@@ -103,15 +114,22 @@ while(1){
 	memset(buffer,0,sizeof(buffer));
 	nbytes = -1;
 	sleep(1);
+
+	// Sets a timeout of 1sec
 	setsockopt(sock, SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
 
-	while(nbytes == -1)
+	 // Receive command from client
+	msg_struct.sequence = 0;
+	while(nbytes == -1 || msg_struct.sequence != 3)
 	{
-		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
-                MSG_WAITALL, ( struct sockaddr *) &remote,
-                &remote_length);
+		nbytes = recvfrom(sock, &msg_struct, sizeof(msg_struct),
+									MSG_WAITALL, ( struct sockaddr *) &remote,
+									&remote_length);
 	}
-
+	if (msg_struct.sequence == 3)
+	{
+		memcpy(buffer,msg_struct.data,MAXBUFSIZE);
+	}
 
 	printf("The client says %s number of bytes received is %d\n", buffer,nbytes);
 
@@ -119,12 +137,16 @@ while(1){
 	// Buffer to store data to be sent to the client
 	char data_buffer[1024*1024*4];
 
+	/*************************************************************************
+	Server will send file to the client
+	*****************t********************************************************/
 	//According to the command entered by the user, perform the appropriate task
 	if (strncmp(buffer, "get", 3) == 0){
 
 		char *ret = strchr(buffer, ' ');
 		FILE *fd = fopen(ret+1,"r");
   	if(fd==NULL){
+				// if fopen fails sends message to client, then exits
       	perror("fopen failed\n");
 				strcpy(data_buffer, "File does not exist");
 				nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
@@ -146,11 +168,15 @@ while(1){
 		sprintf(file_size_str,"%ld", file_size);
 		printf("File size is: %s\n",file_size_str);
 		strcpy(data_buffer,file_size_str);
-		nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
-        			MSG_CONFIRM, (const struct sockaddr *) &remote,
-            			remote_length);
-		printf("file size %i\n", file_size);
+
+		//send file size to client
+		msg_struct.sequence = 5;
+		memcpy(msg_struct.data,data_buffer,MAXBUFSIZE);
+		nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+						MSG_CONFIRM, (const struct sockaddr *) &remote,
+								remote_length);
 		printf("Sending file...\n");
+
 		int ack_flag = 0;
 		buff_size = 1024;
 		while(a <= file_size){
@@ -163,13 +189,18 @@ while(1){
 				printf("Almost done!\n");
 			}
 			printf("a %i\n", a);
-			//printf("buff size %i\n", buff_size);
+
 			fr = fread(data_buffer,buff_size,1,fd);
 			if (fr<0){
       		perror("fread failed\n");
 					exit(1);
     		}
 
+		/*********************************************************************
+		Whenever server receives a positive acknowledgment it updates ack_flag
+		as 0 and the continues receiving packets otherwise sets it as 0 and
+		resends the packet and waits for acknowledgement
+		*********************************************************************/
 		while(ack_flag == 0)
 		{
 			printf("\nsending file %d\n",seq);
@@ -183,6 +214,10 @@ while(1){
 		                MSG_WAITALL, ( struct sockaddr *) &remote,
 		                &remote_length);
 
+			/*******************************************************************
+			 if nbytes > 0, that means recvfrom has received something otherwise
+			 timeout will occur and it will again send the packet and wait for ack
+			 *****************************************************************/
 			if(nbytes > 0)
 			{
 				if((msg_struct_ack.status == RECEIVED) && (msg_struct_ack.sequence == seq) )
@@ -211,30 +246,16 @@ while(1){
 				printf("\nTIMEOUT TIMEOUT TIMEOUT\n");
 			}
 	  }
-		/*
-			while (nbytes == -1){
-			// Reliability protocol
-				while (nbytes == -1){
-					nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
-			                MSG_WAITALL, ( struct sockaddr *) &remote,
-			                &remote_length);
-					}
-				if ((msg_struct_ack.sequence != seq) | ( msg_struct_ack.status != RECEIVED)){
-					nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
-		        			MSG_CONFIRM, (const struct sockaddr *) &remote,
-		            			remote_length);
-											printf("resending data \n");
-					}
-				nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
-			                MSG_WAITALL, ( struct sockaddr *) &remote,
-			                &remote_length);
-			}*/
+
 		}
 		printf("File sent...\n");
 
 		fclose(fd);
 
 	}
+	/*************************************************************************
+	Server will receive file from client
+	*************************************************************************/
 	else if (strncmp(buffer, "put", 3) == 0){
 		int timeout_count = 0;
 		int ack_count = 0;
@@ -243,24 +264,29 @@ while(1){
 		int flag = 0;
 		a = 0;
 		count_flag = 0;
-		nbytes = recvfrom(sock, (char *)buffer, MAXBUFSIZE,
-	                MSG_WAITALL, ( struct sockaddr *) &remote,
-	                &remote_length);
 
+		// Receive file size from client
+		while(nbytes == -1 || msg_struct.sequence !=4)
+		{
+			nbytes = recvfrom(sock, &msg_struct, sizeof(msg_struct),
+										MSG_WAITALL, ( struct sockaddr *) &remote,
+										&remote_length);
+	 	}
+		memcpy(buffer,msg_struct.data,MAXBUFSIZE);
 		file_size = atoi(buffer);
-		printf("file size %i\n", file_size);
-		printf("buff_size %i\n", buff_size);
+
 		if (file_size == 0){
 			printf("File does not exist...\n");
 			exit(0);
 		}
 
 		int sequence_count = (file_size/buff_size);
-int nack = 0;
+		int nack = 0;
 		int num_put;
 		FILE *fp;
 		fp = fopen("client_received_file","w+");
 
+		// loop will run until the whole file is received
 		while(sequence_count >= 0){
 
 			flag = 0;
@@ -272,6 +298,8 @@ int nack = 0;
 				}
 
 			num_put = a-file_size;
+
+			// Only receive the remaining bytes from the client
 			if (num_put > 0){
 				buff_size = file_size-(a-buff_size);
 				rec_size = buff_size+8;
@@ -279,6 +307,11 @@ int nack = 0;
 			}
 			int nbytes1 = 0;
 
+			/********************************************************************
+			flag will be set to 0 when the server receives the data from client
+			but, if timeout occurs while receiving flag will be set to 1 and
+		  loop will be exceuted again
+			********************************************************************/
 			while (flag == 0)
 			{
 
@@ -290,13 +323,14 @@ int nack = 0;
 				{
 					if (msg_struct.sequence == seq)
 					{
+						// Send PACK
 					 msg_struct_ack.sequence = msg_struct.sequence;
 					 msg_struct_ack.status = RECEIVED;
 					 nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
  														        	MSG_CONFIRM, (const struct sockaddr *) &remote,
  												            			remote_length);
 					 printf("\n\nPACKET RECEIVED\n");
-					 printf("seq count after pack %i\n", msg_struct.sequence);
+					 printf("seq count after pack %ld\n", msg_struct.sequence);
 					 printf("seq count %i\n", seq);
 					 if(fwrite(msg_struct.data,1,buff_size,fp)<0)
 					 {
@@ -314,6 +348,7 @@ int nack = 0;
 					}
 				  else
 				  {
+						// Send NACK
 						msg_struct_ack.sequence = seq;//msg_struct.sequence;
 						msg_struct_ack.status = NOT_RECEIVED;
 						//printf("sent ack msg %i\n", msg_struct_ack.status);
@@ -321,7 +356,7 @@ int nack = 0;
 																		 MSG_CONFIRM, (const struct sockaddr *) &remote,
 																				 remote_length);
 						printf("\n\nNACK WRONG PACKET RECEIVED\n");
-						printf("seq count after nack %i\n", msg_struct.sequence);
+						printf("seq count after nack %ld\n", msg_struct.sequence);
 						printf("seq count %i\n", seq);
 						ack_count++;
 				//	exit(0);
@@ -329,6 +364,7 @@ int nack = 0;
 				}
 				else
 				{
+					// If timeout occurs send NACK to the client
 					printf("\nTIMEOUT TIMEOUT TIMEOUT\n");
 					msg_struct_ack.sequence = seq;//msg_struct.sequence;
 					msg_struct_ack.status = NOT_RECEIVED;
@@ -337,54 +373,24 @@ int nack = 0;
 																	 MSG_CONFIRM, (const struct sockaddr *) &remote,
 																			 remote_length);
 					printf("\n\nNACK WRONG PACKET RECEIVED\n");
-					printf("seq count after nack %i\n", msg_struct.sequence);
+					printf("seq count after nack %ld\n", msg_struct.sequence);
 					printf("seq count %i\n", seq);
 					ack_count++;
 
 					timeout_count++;
 				}
-			/*nbytes = recvfrom(sock, &msg_struct, rec_size,
-		                MSG_WAITALL, ( struct sockaddr *) &remote,
-		                &remote_length);
-			printf("Receiving file... seq no %d\n",msg_struct.sequence);
 
-			while (nbytes == -1){
-				msg_struct_ack.sequence = msg_struct.sequence;
-			  msg_struct_ack.status = NOT_RECEIVED;
-				count_flag = 1;
-				nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
-													        	MSG_CONFIRM, (const struct sockaddr *) &remote,
-											            			remote_length);
-				printf("\nsent nack\n");
-				nbytes = recvfrom(sock,&msg_struct, rec_size,
-																										0, ( struct sockaddr *) &remote,
-																		                &remote_length);
-				}
-
-			if (nbytes >= 0){
-				msg_struct_ack.sequence = msg_struct.sequence;
-				msg_struct_ack.status = RECEIVED;
-				count_flag = 0;
-				nbytes = sendto(sock,&msg_struct_ack, sizeof(msg_struct_ack),
-																		MSG_CONFIRM, (const struct sockaddr *) &remote,
-																				remote_length);
-				}
-
-			if (msg_struct_ack.status == RECEIVED){
-				count_flag = 0;
-				if(fwrite(msg_struct.data,1,buff_size,fp)<0){
-						perror("error writting file");
-						exit(1);
-					}
-					else sequence_count -= 1;
-			}*/
 		}
 	}
 		printf("File received...\n");
-				printf("timeout %i ack %i\n", timeout_count, ack_count);
+		printf("timeout %i ack %i\n", timeout_count, ack_count);
 		fclose(fp);
 
 }
+/*************************************************************************
+Server will delete the file specified by the client and sends a message
+in response
+*************************************************************************/
 	else if (strncmp(buffer, "delete", 3) == 0)
 	{
 		char *ret = strchr(buffer, ' ');
@@ -395,6 +401,10 @@ int nack = 0;
 						MSG_CONFIRM, (const struct sockaddr *) &remote,
 								remote_length);
 	}
+/*************************************************************************
+Server will send a list of files present in the server's local folder to
+the client
+*************************************************************************/
 	else if (strcmp(buffer, "ls") == 0)
 	{
 		FILE *fls = popen("ls>ls_op.txt", "r");
@@ -450,7 +460,7 @@ int nack = 0;
 			nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
 																									MSG_WAITALL, ( struct sockaddr *) &remote,
 																									&remote_length);
-
+			// If timeout occurs re-receive the acknowledgment
 	    while (nbytes == -1) {
 	    	while (nbytes == -1) {
 					nbytes = recvfrom(sock, &msg_struct_ack, sizeof(msg_struct_ack),
@@ -471,6 +481,10 @@ int nack = 0;
 		printf("File sent...\n");
 		fclose(fd);
 	}
+	/*************************************************************************
+	When the client sends an exit command, server will send a message to the
+	client regarding the exit and Server will gracefully exit
+	*************************************************************************/
 	else if (strcmp(buffer, "exit") == 0)
 	{
 		strcpy(data_buffer, "exiting");
