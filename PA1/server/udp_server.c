@@ -428,10 +428,11 @@ the client
 		char file_size_str[100];
 		sprintf(file_size_str,"%ld", file_size_ls);
 		strcpy(data_buffer,file_size_str);
-		nbytes = sendto(sock, (const char *)data_buffer, MAXBUFSIZE,
-        			MSG_CONFIRM, (const struct sockaddr *) &remote,
-            			remote_length);
-		printf("data buffer %s\n", data_buffer);
+		msg_struct.sequence = 5;
+		memcpy(msg_struct.data,data_buffer,MAXBUFSIZE);
+		nbytes = sendto(sock, &msg_struct, sizeof(msg_struct),
+						MSG_CONFIRM, (const struct sockaddr *) &remote,
+								remote_length);
 
 		printf("Sending file list....\n");
 
