@@ -6,18 +6,69 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define PortNo 8895
+#define PortNo 8901
 #define MAXBUFFSIZE 100
+char url[100] = {};
+char data_buffer[1024*1024*4] = {};
+char data_content[1024] = {};
+char *ptr;
+char *ptr_data;
+	int socket_server,accept_var;
+
+void get_request(char request_url[], char version[])
+{
+	strcpy(url,"/home/vipraja/Documents/Network systems/ECEN5273/PA2/www");
+	strcat(url, request_url);
+	printf("%s\n", url);
+	FILE *fd = fopen(url, "r");
+	// Get file size
+	printf("fopen done!\n");
+	fseek(fd,0,SEEK_END);
+	int file_size = ftell(fd);
+	fseek(fd,0,SEEK_SET);
+	int fr = fread(data_buffer,1,file_size,fd);
+	printf("fread done fr = %d file size = %d \n",fr,file_size);
+	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: image/gif\r\nContent-Length: %d\r\n\r\n", file_size);
+	//strcat(data_content,data_buffer);
+	//ptr = &data_content[0];
+	//ptr_data  =&data_buffer[0];
+ int write_var = write(accept_var,data_content,strlen(data_content));
+ if (write_var < 0)
+{
+	 perror("ERROR writing to socket");
+}
+else if(write_var > 0)
+{
+	printf("write_var %d content_length %d\n",write_var,strlen(data_content) );
+}
+else
+{
+	printf("Write_var is 0\n");
+}
+
+printf("%s\n", data_content);
+	 write_var = write(accept_var,data_buffer,file_size);
+	 if (write_var < 0)
+	 {
+		 perror("ERROR writing to socket");
+	 }
+	 else if(write_var > 0)
+	 {
+		 printf("write_var %d file_size %d\n",write_var,file_size );
+	 }
+	 else
+	 {
+		 printf("Write_var = 0\n" );
+	 }
+fclose(fd);
+}
 
 int main()
 {
-	int socket_server,accept_var;
+
   char buffer[256];
   struct sockaddr_in server_addr, client_addr;
-	char data_buffer[1024*1024*4] = {};
-	char data_content[1024] = {};
-	char *ptr;
-	char *ptr_data;
+
 
 	socket_server = socket(AF_INET,SOCK_STREAM,0);
 	if(!(socket_server))
@@ -36,6 +87,7 @@ int main()
 	}
 	else printf("Binding successful\n");
 
+//while(1){
 	//listen
 	if(listen(socket_server,5) < 0)
 	{
@@ -58,6 +110,9 @@ int addr_length =  sizeof(client_addr);
 	{
 		perror("ERROR reading from socket");
 	}
+	printf("***************************************\n");
+	printf("%s\n", buff);
+	printf("***************************************\n");
 	   /* get the first token */
 	  char* token = strtok(buff, " \n");
 
@@ -81,8 +136,8 @@ int addr_length =  sizeof(client_addr);
 		 printf("request_method %s\n", request_method);
 		 printf("request_url %s\n", request_url);
 		 printf("request_version %s\n", request_version);
-		 char url[100] = "/home/vipraja/Documents/Network systems/ECEN5273/PA2/www";
-		 strcat(url, request_url);
+		 //char url[100] = "/home/vipraja/Documents/Network systems/ECEN5273/PA2/www";
+		 /*strcat(url, request_url);
 		 printf("%s\n", url);
 		 FILE *fd = fopen(url, "r");
 		 // Get file size
@@ -105,8 +160,11 @@ int addr_length =  sizeof(client_addr);
 			if (write_var < 0)
 				perror("ERROR writing to socket");
 
-	fclose(fd);
+	fclose(fd);*/
+	get_request(request_url,request_version);
 	close(accept_var);
+
+//}
   close(socket_server);
 
 	return 0;
