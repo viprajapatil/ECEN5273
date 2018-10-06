@@ -6,14 +6,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define PortNo 8901
+#define PortNo 8085
 #define MAXBUFFSIZE 100
 char url[100] = {};
 char data_buffer[1024*1024*4] = {};
 char data_content[1024] = {};
-char *ptr;
-char *ptr_data;
-	int socket_server,accept_var;
+char *content_type;
+char content[50] = {};
+int socket_server,accept_var;
 
 void get_request(char request_url[], char version[])
 {
@@ -21,17 +21,46 @@ void get_request(char request_url[], char version[])
 	strcat(url, request_url);
 	printf("%s\n", url);
 	FILE *fd = fopen(url, "r");
+	if (fd == NULL)
+	{
+		perror("fopen failed");
+    close(accept_var);
+		return;
+	}
 	// Get file size
 	printf("fopen done!\n");
 	fseek(fd,0,SEEK_END);
 	int file_size = ftell(fd);
 	fseek(fd,0,SEEK_SET);
+	printf("\nfile size %d\n",file_size);
 	int fr = fread(data_buffer,1,file_size,fd);
-	printf("fread done fr = %d file size = %d \n",fr,file_size);
-	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: image/gif\r\nContent-Length: %d\r\n\r\n", file_size);
-	//strcat(data_content,data_buffer);
-	//ptr = &data_content[0];
-	//ptr_data  =&data_buffer[0];
+	if (fr<0)
+	{
+		perror("fread failed");
+	}
+	printf("fread done fr = %d\n",fr);
+
+	content_type = strchr(request_url, '.');
+	printf("content_type %s\n", content_type);
+
+  if (strcmp(content_type, ".html") == 0)
+		strcpy(content, "text/html");
+	else if (strcmp(content_type, ".txt") == 0)
+		strcpy(content, "text/plain");
+  else if (strcmp(content_type, ".jpg") == 0)
+		strcpy(content, "image/jpg");
+	else if (strcmp(content_type, ".png") == 0)
+		strcpy(content, "image/png");
+	else if (strcmp(content_type, ".gif") == 0)
+		strcpy(content, "image/gif");
+	else if (strcmp(content_type, ".css") == 0)
+		strcpy(content, "text/css");
+	else if (strcmp(content_type, ".js") == 0)
+		strcpy(content, "application/javascript");
+
+printf("content %s\n", content);
+	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",content, file_size);
+
  int write_var = write(accept_var,data_content,strlen(data_content));
  if (write_var < 0)
 {
@@ -61,6 +90,8 @@ printf("%s\n", data_content);
 		 printf("Write_var = 0\n" );
 	 }
 fclose(fd);
+close(accept_var);
+
 }
 
 int main()
@@ -87,7 +118,7 @@ int main()
 	}
 	else printf("Binding successful\n");
 
-//while(1){
+while(1){
 	//listen
 	if(listen(socket_server,5) < 0)
 	{
@@ -101,6 +132,7 @@ int addr_length =  sizeof(client_addr);
   if (accept_var<0)
   {
 	  perror("ERROR on accept");
+		close(accept_var);
   }
 
 	char buff[1024] = {0};
@@ -136,35 +168,10 @@ int addr_length =  sizeof(client_addr);
 		 printf("request_method %s\n", request_method);
 		 printf("request_url %s\n", request_url);
 		 printf("request_version %s\n", request_version);
-		 //char url[100] = "/home/vipraja/Documents/Network systems/ECEN5273/PA2/www";
-		 /*strcat(url, request_url);
-		 printf("%s\n", url);
-		 FILE *fd = fopen(url, "r");
-		 // Get file size
-		 printf("fopen done!\n");
-     fseek(fd,0,SEEK_END);
-  	 int file_size = ftell(fd);
-  	 fseek(fd,0,SEEK_SET);
-		 int fr = fread(data_buffer,file_size,1,fd);
-		 printf("fread doen!\n");
-		 sprintf(data_content,"HTTP/1.1 200 OK\nContent-Type: Text\nContent-Length: %d\nConnection: Keep-alive\n", file_size);
 
-		 //strcat(data_content,data_buffer);
-		 ptr = &data_content[0];
-		 ptr_data  =&data_buffer[0];
-    int write_var = write(accept_var,ptr,sizeof(data_content));
-		if (write_var < 0)
-			perror("ERROR writing to socket");
-
-			write_var = write(accept_var,ptr_data,sizeof(data_buffer));
-			if (write_var < 0)
-				perror("ERROR writing to socket");
-
-	fclose(fd);*/
 	get_request(request_url,request_version);
-	close(accept_var);
 
-//}
+}
   close(socket_server);
 
 	return 0;
