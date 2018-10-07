@@ -5,18 +5,22 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
 
-#define PortNo 8085
+#define PortNo 8088
 #define MAXBUFFSIZE 100
-char url[100] = {};
-char data_buffer[1024*1024*4] = {};
-char data_content[1024] = {};
-char *content_type;
-char content[50] = {};
-int socket_server,accept_var;
+int socket_server,accept_var[100];
+int i = 0;
 
-void get_request(char request_url[], char version[])
+
+void get_request(int accept_var, char request_url[], char version[])
 {
+	char url[100] = {};
+	char data_buffer[1024*1024*4] = {};
+	char data_content[1024] = {};
+	char *content_type;
+	char content[50] = {};
+
 	strcpy(url,"/home/vipraja/Documents/Network systems/ECEN5273/PA2/www");
 	strcat(url, request_url);
 	printf("%s\n", url);
@@ -24,6 +28,7 @@ void get_request(char request_url[], char version[])
 	if (fd == NULL)
 	{
 		perror("fopen failed");
+		shutdown(accept_var,SHUT_RDWR);
     close(accept_var);
 		return;
 	}
@@ -53,10 +58,9 @@ void get_request(char request_url[], char version[])
 		strcpy(content, "image/png");
 	else if (strcmp(content_type, ".gif") == 0)
 		strcpy(content, "image/gif");
-	else if (strcmp(content_type, ".css") == 0)
-		strcpy(content, "text/css");
 	else if (strcmp(content_type, ".js") == 0)
 		strcpy(content, "application/javascript");
+	else strcpy(content, "text/css");
 
 printf("content %s\n", content);
 	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",content, file_size);
@@ -90,8 +94,9 @@ printf("%s\n", data_content);
 		 printf("Write_var = 0\n" );
 	 }
 fclose(fd);
+shutdown(accept_var,SHUT_RDWR);
 close(accept_var);
-
+printf("\nComplete\n");
 }
 
 int main()
@@ -99,7 +104,7 @@ int main()
 
   char buffer[256];
   struct sockaddr_in server_addr, client_addr;
-
+  pid_t child_thread;
 
 	socket_server = socket(AF_INET,SOCK_STREAM,0);
 	if(!(socket_server))
@@ -118,26 +123,26 @@ int main()
 	}
 	else printf("Binding successful\n");
 
-while(1){
+
 	//listen
 	if(listen(socket_server,5) < 0)
 	{
 		perror("ERROR listening");
 	}
 	else printf("Listening success\n");
-
+while(1){
 int addr_length =  sizeof(client_addr);
 	//accept
-	accept_var = accept(socket_server, (struct sockaddr *) &client_addr, &addr_length);
-  if (accept_var<0)
+	accept_var[i] = accept(socket_server, (struct sockaddr *) &client_addr, &addr_length);
+  if (accept_var[i]<0)
   {
 	  perror("ERROR on accept");
-		close(accept_var);
+		close(accept_var[i]);
   }
 
 	char buff[1024] = {0};
 
-  int read_var = read(accept_var,buff,sizeof(buff));
+  int read_var = read(accept_var[i],buff,sizeof(buff));
 	if (read_var < 0)
 	{
 		perror("ERROR reading from socket");
@@ -169,8 +174,14 @@ int addr_length =  sizeof(client_addr);
 		 printf("request_url %s\n", request_url);
 		 printf("request_version %s\n", request_version);
 
-	get_request(request_url,request_version);
-
+  child_thread = fork();
+	if (child_thread == 0)
+	{
+		get_request(accept_var[i],request_url,request_version);
+		exit(1);
+	}
+  i++;
+	i = i%99;
 }
   close(socket_server);
 
