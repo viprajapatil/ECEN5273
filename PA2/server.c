@@ -20,6 +20,11 @@ void get_request(int accept_var, char request_url[], char version[])
 	char data_content[1024] = {};
 	char *content_type;
 	char content[50] = {};
+	char error_header[] =
+	"HTTP/1.1 500 Internal Server Error\r\n"
+	"Content-Type: text/html; charset = UTF-8\r\n\r\n"
+	"<!DOCTYPE html>\r\n"
+	"<body><center><h1>ERROR 500: Internal Server Error</h1><br>\r\n";
 
 	strcpy(url,"/home/vipraja/Documents/Network systems/ECEN5273/PA2/www");
 	strcat(url, request_url);
@@ -28,6 +33,13 @@ void get_request(int accept_var, char request_url[], char version[])
 	if (fd == NULL)
 	{
 		perror("fopen failed");
+		//strcpy(data_content, "HTTP/1.1 500 Internal Server Error");
+		printf("header value is: %s\n\n",error_header);
+		int write_var = send(accept_var,error_header,strlen(error_header),0);
+	  if (write_var < 0)
+	  {
+	 	  perror("ERROR writing to socket");
+	  }
 		shutdown(accept_var,SHUT_RDWR);
     close(accept_var);
 		return;
@@ -70,14 +82,6 @@ printf("content %s\n", content);
 {
 	 perror("ERROR writing to socket");
 }
-else if(write_var > 0)
-{
-	printf("write_var %d content_length %d\n",write_var,strlen(data_content) );
-}
-else
-{
-	printf("Write_var is 0\n");
-}
 
 printf("%s\n", data_content);
 	 write_var = write(accept_var,data_buffer,file_size);
@@ -99,7 +103,7 @@ close(accept_var);
 printf("\nComplete\n");
 }
 
-int main()
+int main(int argc, char * argv[])
 {
 
   char buffer[256];
@@ -115,7 +119,7 @@ int main()
 
 	server_addr.sin_family = AF_INET;
   server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(PortNo);
+  server_addr.sin_port = htons(atoi(argv[1]));
 
 	if (bind(socket_server, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0)
 	{
