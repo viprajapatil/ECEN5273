@@ -11,20 +11,19 @@
 #define MAXBUFFSIZE 100
 int socket_server,accept_var[100];
 int i = 0;
+char error_header[] =
+"HTTP/1.1 500 Internal Server Error\r\n"
+"Content-Type: text/html; charset = UTF-8\r\n\r\n"
+"<!DOCTYPE html>\r\n"
+"<body><center><h1>ERROR 500: Internal Server Error</h1><br>\r\n";
 
-
-void get_request(int accept_var, char request_url[], char version[])
+void get_request(int accept_var, char request_url[], char version[], char connection[])
 {
 	char url[100] = {};
 	char data_buffer[1024*1024*4] = {};
 	char data_content[1024] = {};
 	char *content_type;
 	char content[50] = {};
-	char error_header[] =
-	"HTTP/1.1 500 Internal Server Error\r\n"
-	"Content-Type: text/html; charset = UTF-8\r\n\r\n"
-	"<!DOCTYPE html>\r\n"
-	"<body><center><h1>ERROR 500: Internal Server Error</h1><br>\r\n";
 
 	strcpy(url,"/home/vipraja/Documents/Network systems/ECEN5273/PA2/www");
 	strcat(url, request_url);
@@ -33,8 +32,6 @@ void get_request(int accept_var, char request_url[], char version[])
 	if (fd == NULL)
 	{
 		perror("fopen failed");
-		//strcpy(data_content, "HTTP/1.1 500 Internal Server Error");
-		printf("header value is: %s\n\n",error_header);
 		int write_var = send(accept_var,error_header,strlen(error_header),0);
 	  if (write_var < 0)
 	  {
@@ -75,7 +72,7 @@ void get_request(int accept_var, char request_url[], char version[])
 	else strcpy(content, "text/css");
 
 printf("content %s\n", content);
-	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n",content, file_size);
+	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: %s\r\nContent-Length: %d\r\n\r\n",content, connection, file_size);
 
  int write_var = write(accept_var,data_content,strlen(data_content));
  if (write_var < 0)
@@ -155,33 +152,51 @@ int addr_length =  sizeof(client_addr);
 	printf("%s\n", buff);
 	printf("***************************************\n");
 	   /* get the first token */
-	  char* token = strtok(buff, " \n");
+	char* token = strtok(buff, " \n");
 
-		char request_method[100], request_url[100], request_version[100], connection[100];
-		int token_count = 0;
+	char request_method[100], request_url[100], request_version[100], connection[100];
+	int token_count = 0;
 
-	   /* walk through other tokens */
-	   while( token != NULL ) {
-	      token_count++;
+  /* walk through other tokens */
+	while( token != NULL ) {
+	   token_count++;
 
-				if (token_count == 1)
-					 strcpy(request_method, token);
-				else if (token_count == 2)
-			   	 strcpy(request_url, token);
-				else if (token_count == 3)
-					 strcpy(request_version, token);
-	      token = strtok(NULL, " \n");
-				if (token_count == 3)
-					break;
-	   }
-		 printf("request_method %s\n", request_method);
-		 printf("request_url %s\n", request_url);
-		 printf("request_version %s\n", request_version);
+	   if (token_count == 1)
+				strcpy(request_method, token);
+		 else if (token_count == 2)
+			  strcpy(request_url, token);
+		 else if (token_count == 3)
+				strcpy(request_version, token);
+		 else if (strcmp(token, "Connection:") == 0)
+		 {
+			 token = strtok(NULL, " \n");
+			 strcpy(connection, token);
+		 }
+	   token = strtok(NULL, " \n");
+		 /*if (token_count == 3)
+					break;*/
+
+	 }
+	printf("request_method %s\n", request_method);
+	printf("request_url %s\n", request_url);
+	printf("request_version %s\n", request_version);
 
   child_thread = fork();
+
 	if (child_thread == 0)
 	{
-		get_request(accept_var[i],request_url,request_version);
+		if (strcmp(request_method,"GET") == 0)
+			get_request(accept_var[i],request_url,request_version,connection);
+    else
+		{
+			int write_var = send(accept_var[i],error_header,strlen(error_header),0);
+			if (write_var < 0)
+			{
+				perror("ERROR writing to socket");
+			}
+			shutdown(accept_var[i],SHUT_RDWR);
+			close(accept_var[i]);
+		}
 		exit(1);
 	}
   i++;
