@@ -170,7 +170,9 @@ int addr_length =  sizeof(client_addr);
 		 else if (strcmp(token, "Connection:") == 0)
 		 {
 			 token = strtok(NULL, " \n");
-			 strcpy(connection, token);
+			 if (strcmp(token, "keep alive") == 0)
+			 		strcpy(connection, token);
+			 else strcpy(token, "close");
 		 }
 	   token = strtok(NULL, " \n");
 		 /*if (token_count == 3)
@@ -207,3 +209,4 @@ int addr_length =  sizeof(client_addr);
 	return 0;
 
 }
+
