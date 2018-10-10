@@ -27,7 +27,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 
 	strcpy(url,"/home/vipraja/Documents/Network systems/ECEN5273/PA2/www");
 	strcat(url, request_url);
-	printf("%s\n", url);
 	FILE *fd = fopen(url, "r");
 	if (fd == NULL)
 	{
@@ -71,16 +70,16 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 		strcpy(content, "application/javascript");
 	else strcpy(content, "text/css");
 
-printf("content %s\n", content);
+	printf("content %s\n", content);
 	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: %s\r\nContent-Length: %d\r\n\r\n",content, connection, file_size);
 
- int write_var = write(accept_var,data_content,strlen(data_content));
- if (write_var < 0)
-{
-	 perror("ERROR writing to socket");
-}
+ 	int write_var = write(accept_var,data_content,strlen(data_content));
+ 	if (write_var < 0)
+	{
+	 	perror("ERROR writing to socket");
+	}
 
-printf("%s\n", data_content);
+	printf("%s\n", data_content);
 	 write_var = write(accept_var,data_buffer,file_size);
 	 if (write_var < 0)
 	 {
@@ -94,16 +93,33 @@ printf("%s\n", data_content);
 	 {
 		 printf("Write_var = 0\n" );
 	 }
-fclose(fd);
-shutdown(accept_var,SHUT_RDWR);
-close(accept_var);
-printf("\nComplete\n");
+	 fclose(fd);
+	 shutdown(accept_var,SHUT_RDWR);
+	 close(accept_var);
+	 printf("\nComplete\n");
+}
+
+/*
+POST FUNCTION
+*/
+void post_request(int accept_var, char request_url[], char version[], char connection[], char received_buffer[])
+{
+	printf("**************Received*****************\n");
+	printf("%s\n", received_buffer);
+	printf("**************Received*****************\n");
+	int write_var = write(accept_var,received_buffer,strlen(received_buffer));
+ 	if (write_var < 0)
+	{
+	 	perror("ERROR writing to socket");
+	}
+
 }
 
 int main(int argc, char * argv[])
 {
 
   char buffer[256];
+	char received_buffer[1024];
   struct sockaddr_in server_addr, client_addr;
   pid_t child_thread;
 
@@ -148,11 +164,23 @@ int addr_length =  sizeof(client_addr);
 	{
 		perror("ERROR reading from socket");
 	}
+
+	char new_buffer[1024] = {};
+	int j = 0;
+	for(int i = 0; i<read_var; i++)
+	{
+		if(buff[i]!='\0')
+		{
+			new_buffer[j] = buff[i];
+			j++;
+		}
+	}
+
 	printf("***************************************\n");
-	printf("%s\n", buff);
+	printf("%s\n", new_buffer);
 	printf("***************************************\n");
 	   /* get the first token */
-	char* token = strtok(buff, " \n");
+	char* token = strtok(new_buffer, " \n");
 
 	char request_method[100], request_url[100], request_version[100], connection[100];
 	int token_count = 0;
@@ -170,25 +198,52 @@ int addr_length =  sizeof(client_addr);
 		 else if (strcmp(token, "Connection:") == 0)
 		 {
 			 token = strtok(NULL, " \n");
-			 if (strcmp(token, "keep alive") == 0)
-			 		strcpy(connection, token);
-			 else strcpy(token, "close");
-		 }
-	   token = strtok(NULL, " \n");
-		 /*if (token_count == 3)
-					break;*/
+		   strcpy(connection, token);
+			 if (strcmp(connection, "keep-alive") != 0 | strcmp(connection, "Keepalive") != 0)
+			 {
+				  strcpy(connection, "close");
+			 }
+			 if (strcmp(request_method, "POST") == 0)
+			 {
+				 token = strtok(NULL, " \n");
+				 token = strtok(NULL, " \n");
+				 strcpy(received_buffer, token);
 
+				 while(token !=  "\0")
+				 {
+					  token = strtok(NULL, " ");
+						if(token == NULL)
+						{
+							break;
+						}
+						strcat(received_buffer, " ");
+					 	strcat(received_buffer, token);
+
+				 }
+				 printf("data---> %s\n", received_buffer);
+
+			 }
+
+		 }
+
+	   token = strtok(NULL, " \n");
 	 }
 	printf("request_method %s\n", request_method);
 	printf("request_url %s\n", request_url);
 	printf("request_version %s\n", request_version);
-
+	printf("connection %s\n", connection);
   child_thread = fork();
 
 	if (child_thread == 0)
 	{
 		if (strcmp(request_method,"GET") == 0)
+		{
 			get_request(accept_var[i],request_url,request_version,connection);
+		}
+		else if (strcmp(request_method, "POST") == 0)
+		{
+			post_request(accept_var[i],request_url,request_version,connection, received_buffer);
+		}
     else
 		{
 			int write_var = send(accept_var[i],error_header,strlen(error_header),0);
@@ -209,4 +264,3 @@ int addr_length =  sizeof(client_addr);
 	return 0;
 
 }
-
