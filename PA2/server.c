@@ -54,7 +54,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	printf("fread done fr = %d\n",fr);
 
 	content_type = strchr(request_url, '.');
-	printf("content_type %s\n", content_type);
 
   if (strcmp(content_type, ".html") == 0)
 		strcpy(content, "text/html");
@@ -69,9 +68,8 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	else if (strcmp(content_type, ".js") == 0)
 		strcpy(content, "application/javascript");
 	else strcpy(content, "text/css");
-
-	printf("content %s\n", content);
-	sprintf(data_content,"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nConnection: %s\r\nContent-Length: %d\r\n\r\n",content, connection, file_size);
+	printf("VERSION ---> %s\n", version);
+	sprintf(data_content,"%s 200 OK\r\nContent-Type: %s\r\nConnection: %s\r\nContent-Length: %d\r\n\r\n",version, content, connection, file_size);
 
  	int write_var = write(accept_var,data_content,strlen(data_content));
  	if (write_var < 0)
@@ -104,6 +102,10 @@ POST FUNCTION
 */
 void post_request(int accept_var, char request_url[], char version[], char connection[], char received_buffer[])
 {
+	char url[100] = {};
+	char data_buffer[1024*1024*4] = {};
+	strcpy(url,"/home/vipraja/Documents/Network systems/ECEN5273/PA2/www");
+	strcat(url, request_url);
 	printf("**************Received*****************\n");
 	printf("%s\n", received_buffer);
 	printf("**************Received*****************\n");
@@ -112,7 +114,27 @@ void post_request(int accept_var, char request_url[], char version[], char conne
 	{
 	 	perror("ERROR writing to socket");
 	}
-
+	printf("\nSending requested url.....\n");
+	FILE *fd = fopen(url, "r");
+	if (fd == NULL)
+	{
+		perror("fopen failed");
+	}
+	printf("fopen done!\n");
+	fseek(fd,0,SEEK_END);
+	int file_size = ftell(fd);
+	fseek(fd,0,SEEK_SET);
+	printf("\nfile size %d\n",file_size);
+	int fr = fread(data_buffer,1,file_size,fd);
+	if (fr<0)
+	{
+		perror("fread failed");
+	}
+	write_var = write(accept_var,data_buffer,file_size);
+	if (write_var < 0)
+	{
+		perror("ERROR writing to socket");
+	}
 }
 
 int main(int argc, char * argv[])
