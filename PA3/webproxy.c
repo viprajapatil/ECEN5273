@@ -19,6 +19,7 @@
 #define BufferSize 1024
 int socket_server,accept_var[100], socket_server_proxy;
 int i = 0;
+int connection_flag = 0;
 
 // Define error header
 char error_header[] =
@@ -100,7 +101,10 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	printf("receiving.....\n");
 	int bytesReceived = 0;
 	FILE *fd;
-	fd = fopen("index.html", "w");
+	char url_cache[100];
+	strcpy(url_cache ,request_url);
+	strcat(url_cache, ".html");
+	fd = fopen(url_cache, "w");
 	if (fd == NULL)
 	{
 		perror("fopen failed");
@@ -125,7 +129,7 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 */
 void webserver_handler(int socket_connection_id)
 {
-	  int connection_flag = 0;
+
 		struct timeval tv;
 		tv.tv_sec = 10;
 		tv.tv_usec = 0;
@@ -191,15 +195,19 @@ void webserver_handler(int socket_connection_id)
 			  	{
 				 		token = strtok(NULL, " \n");
 			   		strcpy(connection, token);
-				 		if (/*(strcmp(connection, "keep-alive")==0) || */(strncmp(connection, "Keepalive",strlen("Keepalive")) == 0))
+				 		if ((strncmp(connection, "Keepalive",strlen("Keepalive")) == 0))
 				 		{
 							connection_flag = 1;
 				 		}
-						else
+						else if ((strncmp(connection, "close",strlen("close")) == 0))
 						{
 							strcpy(connection, "close");
 							connection_flag = 0;
 						}
+						else if(strcmp(connection, "")==0)
+						{
+							 connection_flag = 1;
+						 }
 				 		if (strcmp(request_method, "POST") == 0)
 				 		{
 					 		token = strtok(NULL, " \n");
@@ -220,9 +228,12 @@ void webserver_handler(int socket_connection_id)
 					 		printf("data---> %s\n", received_buffer);
 				 	  }
 			 		}
-
 			 		token = strtok(NULL, " \n");
 		  	}
+				if (strcmp(connection, "") == 0)
+				{
+					connection_flag = 1;
+				}
 
 				printf("request_method %s\n", request_method);
 				printf("request_url %s\n", request_url);
@@ -249,7 +260,7 @@ void webserver_handler(int socket_connection_id)
 					shutdown(accept_var[i],SHUT_RDWR);
 				//close(accept_var[i]);
 				}
-
+				printf("\nconnection flag  %i\n", connection_flag);
 		}while(connection_flag);
 
 		exit(1);
