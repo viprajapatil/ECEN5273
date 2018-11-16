@@ -40,12 +40,16 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	char data_buffer[1024*1024*4] = {};
 	char data_content[1024] = {};
 	char *content_type;
+	char complete_path[1000];
 	char content[50] = {};
 
 	printf("requested url is: %s\n", request_url);
 	request_url = strstr(request_url,"//");
 	request_url = request_url + 2;
 	printf("requested url is: %s\n", request_url);
+	strcpy(complete_path,request_url);
+	printf("requested website is: %s\n\n",complete_path);
+	request_url = strtok(complete_path,"/");
 	struct hostent *lh = gethostbyname(request_url);
 
 	content_type = strchr(request_url, '.');
@@ -66,7 +70,19 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	printf("VERSION ---> %s\n", version);
 
 	char msg_from_proxy[100];
-	sprintf(msg_from_proxy,"GET / %s\r\nHost: %s\r\nConnection: close\r\n\r\n",version, request_url);
+	char *req_url;
+	req_url = strtok(NULL, " ");
+	printf("req url --> %s\n", req_url);
+	if (req_url != 0)
+	{
+		sprintf(msg_from_proxy,"GET /%s %s\r\nHost: %s\r\nConnection: close\r\n\r\n",req_url,version,request_url);
+	}
+	else
+	{
+		sprintf(msg_from_proxy,"GET / %s\r\nHost: %s\r\nConnection: close\r\n\r\n",version, request_url);
+	}
+	printf("message--> %s\n", msg_from_proxy);
+ 	printf("\nsize of message --> %d\n", strlen(msg_from_proxy));
   printf("\n\nCreating socket\n\n");
 	struct sockaddr_in server_addr_proxy;
 	socket_server_proxy = socket(AF_INET,SOCK_STREAM,0);
@@ -78,6 +94,7 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	setsockopt(socket_server_proxy, SOL_SOCKET,SO_REUSEADDR,&tv,sizeof(tv));
 	// Defining attributes for so socket
 	server_addr_proxy.sin_family = AF_INET;
+	printf("REACHED HERE3\n");
 	printf("\n\nproxy memcpy %s \n value %d\n\n", lh->h_addr, lh->h_length);
   memcpy(&server_addr_proxy.sin_addr,lh->h_addr,lh->h_length);
 	printf("\n\nproxy memcpy done\n\n");
@@ -114,11 +131,13 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	while(bytesReceived > 0)
 	{
  		fwrite(readBuffer , 1 , sizeof(readBuffer) , fd );
+    send(accept_var,readBuffer,bytesReceived,0);
 		bzero( readBuffer, sizeof(readBuffer));
 		bytesReceived = recv(socket_server_proxy, readBuffer, sizeof(readBuffer), 0 );
  		printf("NUmber of bytes recieved is: %d\n", bytesReceived);
 	}
    fclose(fd);
+	 close(socket_server_proxy);
 }
 
 /*
@@ -144,12 +163,12 @@ void webserver_handler(int socket_connection_id)
 
 	 			printf("\nWAITING TO RECEIVE A COMMAND\n");
 				char buff[1024] = {0};
-				int read_var = recv(accept_var[i], buff, sizeof(buff), 0);
+				int read_var = recv(socket_connection_id, buff, sizeof(buff), 0);
 				if (read_var < 0)
 				{
 					printf("\nConnection timed out\n");
 					//	shutdown(accept_var[i],SHUT_RDWR);
-					close(accept_var[i]);
+					close(socket_connection_id);
 					return;
 				}
 
@@ -190,6 +209,7 @@ void webserver_handler(int socket_connection_id)
 			  	else if (token_count == 3)
 			  	{
 			 			strcpy(request_version, token);
+						request_version[8]='\0';
 			  	}
 			  	else if (strcmp(token, "Connection:") == 0)
 			  	{
@@ -234,11 +254,11 @@ void webserver_handler(int socket_connection_id)
 				{
 					connection_flag = 1;
 				}
-
+/*
 				printf("request_method %s\n", request_method);
 				printf("request_url %s\n", request_url);
 				printf("request_version %s\n", request_version);
-				printf("connection %s\n", connection);
+				printf("connection %s\n", connection);*/
 
 				// After receiving a request, create a thread using fork. This is done for
 				// handling multiple requests from the client.
@@ -248,22 +268,24 @@ void webserver_handler(int socket_connection_id)
 		//{
 				if (strcmp(request_method,"GET") == 0)
 				{
-					get_request(accept_var[i],request_url,request_version,connection);
+					get_request(socket_connection_id,request_url,request_version,connection);
 				}
 	    	else
 				{
-					int write_var = send(accept_var[i],error_header,strlen(error_header),0);
+					int write_var = send(socket_connection_id,error_header,strlen(error_header),0);
 					if (write_var < 0)
 					{
 						perror("ERROR writing to socket");
 					}
-					shutdown(accept_var[i],SHUT_RDWR);
-				//close(accept_var[i]);
+					//shutdown(socket_connection_id,SHUT_RDWR);
+				  close(accept_var[i]);
 				}
 				printf("\nconnection flag  %i\n", connection_flag);
 		}while(connection_flag);
-
-		exit(1);
+		shutdown(socket_connection_id,SHUT_RDWR);
+		close(socket_connection_id);
+		printf("Shutting down socket\n");
+		//exit(1);
 }
 
 
@@ -308,8 +330,9 @@ int main(int argc, char * argv[])
 	}
 	else printf("Listening success\n");
 
-while(1){
-
+while(1)
+{
+	printf("entered while loop...\n");
 	int addr_length =  sizeof(client_addr);
 	//accept
 	accept_var[i] = accept(socket_server, (struct sockaddr *) &client_addr, &addr_length);
@@ -326,14 +349,19 @@ while(1){
 	if (child_thread == 0)
 	{
 		webserver_handler(accept_var[i]);
-		exit(1);
+		printf("exited handler...\n");
+		//close(socket_server);
+		exit(0);
+	}
+	else
+	{
+		printf("\nIn the else loop\n");
+		close(accept_var[i]);
 	}
 
 	i++;
 	i = i%99;
 }
-
-  close(socket_server);
 
 	return 0;
 }
