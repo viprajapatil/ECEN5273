@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <netdb.h>
+#include <openssl/md5.h>
 
 #define PortNo 8088
 #define MAXBUFFSIZE 100
@@ -28,6 +29,20 @@ char error_header[] =
 "<!DOCTYPE html>\r\n"
 "<body><center><h1>ERROR 500: Internal Server Error</h1><br>\r\n";
 
+char* md5sum_calculate(char *name, int name_size)
+{
+	unsigned char digest[16];
+	MD5_CTX context;
+	MD5_Init(&context);
+	MD5_Update(&context, name, name_size);
+	MD5_Final(digest, &context);
+
+	char* md5string = (char*)malloc(33);
+	for(int i = 0; i < 16; ++i)
+  sprintf(&md5string[i*2], "%02x", (unsigned int)digest[i]);
+	return md5string;
+}
+
 /*
 @brief
 */
@@ -41,15 +56,24 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	char data_content[1024] = {};
 	char *content_type;
 	char complete_path[1000];
+	char cache_file_path[10000];
 	char content[50] = {};
-
 	printf("requested url is: %s\n", request_url);
 	request_url = strstr(request_url,"//");
 	request_url = request_url + 2;
 	printf("requested url is: %s\n", request_url);
 	strcpy(complete_path,request_url);
+	strcpy(cache_file_path,complete_path);
+	printf("\n\n\n\n\n\ncache_file_path is: %s\n\n\n\n\n\n",cache_file_path);
+	//
+
+	//
+
+	char cache[1000];
+	strcpy(cache, complete_path);
 	printf("requested website is: %s\n\n",complete_path);
 	request_url = strtok(complete_path,"/");
+	printf("\n\nREQUEST URL IS:%s\n\n",request_url);
 	struct hostent *lh = gethostbyname(request_url);
 
 	content_type = strchr(request_url, '.');
@@ -73,6 +97,45 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	char *req_url;
 	req_url = strtok(NULL, " ");
 	printf("req url --> %s\n", req_url);
+	char u[1000];
+	char* ptr = complete_path;
+	char* md = md5sum_calculate(ptr, strlen(complete_path));
+	if(req_url == 0)
+	{
+		sprintf(u,"%s.html",md);
+	}
+	else
+	{
+		ptr = req_url;
+		char* md_req = md5sum_calculate(ptr, strlen(req_url));
+		sprintf(u,"%s%s.html",md,md_req);
+	}
+	printf("\n\n\n\nvalue of u is: %s\n\n\n\n\n\n",u);
+	int num_bytes;
+	FILE* fp = fopen(u,"r");
+	if(fp == NULL)
+	{
+		//fclose(fp);
+		printf("\n\n\n\n\n\n\n\n\n %s does not exist!\n\n\n\n\n\n", u);
+	}
+	else
+	{
+		printf("\n\n\n\n\n\n\n File exists! %s\n\n\n\n\n\n\n", u);
+		do
+		{
+			memset(data_buffer,'\0',sizeof(data_buffer));
+			num_bytes = fread(data_buffer, 1, sizeof(data_buffer), fp);
+			if(num_bytes< 0)
+				perror("FREAD error");
+			printf("numbytes value is: %d\n\n",num_bytes);
+			int nbytes_send = send(accept_var,data_buffer,num_bytes,0);
+			printf("nbytes send value is: %d\n\n",nbytes_send);
+		}while(num_bytes);
+		fclose(fp);
+		shutdown(accept_var,SHUT_RDWR);
+		return;
+	}
+
 	if (req_url != 0)
 	{
 		sprintf(msg_from_proxy,"GET /%s %s\r\nHost: %s\r\nConnection: close\r\n\r\n",req_url,version,request_url);
@@ -82,7 +145,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 		sprintf(msg_from_proxy,"GET / %s\r\nHost: %s\r\nConnection: close\r\n\r\n",version, request_url);
 	}
 	printf("message--> %s\n", msg_from_proxy);
- 	printf("\nsize of message --> %d\n", strlen(msg_from_proxy));
   printf("\n\nCreating socket\n\n");
 	struct sockaddr_in server_addr_proxy;
 	socket_server_proxy = socket(AF_INET,SOCK_STREAM,0);
@@ -119,18 +181,31 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	int bytesReceived = 0;
 	FILE *fd;
 	char url_cache[100];
-	strcpy(url_cache ,request_url);
-	strcat(url_cache, ".html");
-	fd = fopen(url_cache, "w");
-	if (fd == NULL)
+		strcpy(url_cache ,complete_path);
+	printf("\n\n\n\n\n\n\ncomplete file path is: %s\n\n\n\n\n\n", url_cache);
+
+	char* ptr_cache = url_cache;
+	char* md_cache = md5sum_calculate(ptr_cache, strlen(url_cache));
+	char* md_cache_req;
+	if(req_url == 0)
 	{
-		perror("fopen failed");
+		sprintf(url_cache,"%s.html",md_cache);
 	}
+	else
+	{
+		char* ptr_cache_req = req_url;
+		md_cache_req = md5sum_calculate(ptr_cache_req, strlen(req_url));
+		sprintf(url_cache,"%s%s.html",md_cache,md_cache_req);
+	}
+
+	printf("url cache --> %s\n", url_cache);
+  fd=fopen(url_cache,"ab");
+  memset(readBuffer,'\0',sizeof(readBuffer));
 	bytesReceived = recv(socket_server_proxy, readBuffer, sizeof(readBuffer), 0 );
 	printf("NUmber of bytes recieved is: %d\n", bytesReceived);
 	while(bytesReceived > 0)
 	{
- 		fwrite(readBuffer , 1 , sizeof(readBuffer) , fd );
+ 		fwrite(readBuffer , 1 , bytesReceived , fd );
     send(accept_var,readBuffer,bytesReceived,0);
 		bzero( readBuffer, sizeof(readBuffer));
 		bytesReceived = recv(socket_server_proxy, readBuffer, sizeof(readBuffer), 0 );
@@ -254,6 +329,8 @@ void webserver_handler(int socket_connection_id)
 				{
 					connection_flag = 1;
 				}
+
+				//printf("md --->> %s\n", md);
 /*
 				printf("request_method %s\n", request_method);
 				printf("request_url %s\n", request_url);
