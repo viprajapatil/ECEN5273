@@ -14,6 +14,8 @@
 #include <signal.h>
 #include <netdb.h>
 #include <openssl/md5.h>
+#include <time.h>
+#include <arpa/inet.h>
 
 #define PortNo 8088
 #define MAXBUFFSIZE 100
@@ -21,7 +23,10 @@
 int socket_server,accept_var[100], socket_server_proxy;
 int i = 0;
 int connection_flag = 0;
-
+int timeout_cache =0;
+long double timestamp_req_func;
+time_t timestamp_req;
+int req_count = 0;
 // Define error header
 char error_header[] =
 "HTTP/1.1 500 Internal Server Error\r\n"
@@ -43,6 +48,19 @@ char* md5sum_calculate(char *name, int name_size)
 	return md5string;
 }
 
+void cache_timeout(long double t)
+{
+	printf("\n\n@@@@@Entered cache loop@@@@@\n\n");
+	time_t timestamp;
+	time(&timestamp);
+	if ((timestamp-t) >= timeout_cache)
+	{
+		char *cmd = "cd ~/Documents/Network\\ systems/ECEN5273/PA3/cache;rm *.html";
+		system(cmd);
+	}
+	printf("\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n");
+}
+
 /*
 @brief
 */
@@ -58,6 +76,8 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	char complete_path[1000];
 	char cache_file_path[10000];
 	char content[50] = {};
+	char* addr;
+
 //	printf("requested url is: %s\n", request_url);
 	request_url = strstr(request_url,"//");
 	request_url = request_url + 2;
@@ -70,7 +90,11 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 //	printf("requested website is: %s\n\n",complete_path);
 	request_url = strtok(complete_path,"/");
 //	printf("\n\nREQUEST URL IS:%s\n\n",request_url);
+	struct sockaddr_in server_addr_proxy;
 	struct hostent *lh = gethostbyname(request_url);
+	memcpy(&server_addr_proxy.sin_addr,lh->h_addr,lh->h_length);
+	addr = inet_ntoa(server_addr_proxy.sin_addr);
+	printf("addr --->  %s\n", addr);
 
 	content_type = strchr(request_url, '.');
 // parsing the requested data for getting content type
@@ -87,12 +111,40 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	else if (strcmp(content_type, ".js") == 0)
 		strcpy(content, "application/javascript");
 	else strcpy(content, "text/css");
-//	printf("VERSION ---> %s\n", version);
+
+	char cache_read_buffer[1024*1024];
+	memset(cache_read_buffer,'\0',sizeof(cache_read_buffer));
+	// open cache_data
+	FILE* fd_read;
+	fd_read = fopen("cache.txt","r");
+
+	fseek (fd_read, 0, SEEK_END);
+	int size = ftell(fd_read);
+	fseek(fd_read,0,SEEK_SET);  /*reset the file pointer to start of file*/
+	printf("SIZE *********>>> %d\n", size);
+	if (size != 0)
+	{
+	char line[1000];
+
+  while(!feof(fd_read)){
+  	fgets(line, 200,fd_read);
+  }
+	printf("\n\n\n\n\nLINE VALUE IS: %s\n\n\n\n\n",line);
+	char* token = strstr(line,"time:");
+	//token = strtok(token, "time:");
+	printf("token ----->>>>>>>>>>>%s\n", token);
+	}
+	fclose(fd_read);
+
+	cache_timeout(timestamp_req_func);
+	time(&timestamp_req);
+	timestamp_req_func = timestamp_req;
 
 	char msg_from_proxy[100];
 	char *req_url;
 	req_url = strtok(NULL, " ");
 //	printf("req url --> %s\n", req_url);
+
 	char u[1000];
 	char* ptr = complete_path;
 	char* md = md5sum_calculate(ptr, strlen(complete_path));
@@ -106,17 +158,18 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 		char* md_req = md5sum_calculate(ptr, strlen(req_url));
 		sprintf(u,"./cache/%s%s.html",md,md_req);
 	}
-//	printf("\n\n\n\nvalue of u is: %s\n\n\n\n\n\n",u);
+
+
 	int num_bytes;
 	FILE* fp = fopen(u,"r");
 	if(fp == NULL)
 	{
 		//fclose(fp);
-		printf("\n\n\n--------------- %s does not exist! ----------------\n\n\n", u);
+		printf("\n\n\n--------------- FILE DOES NOT EXIST! %s ----------------\n\n\n", u);
 	}
 	else
 	{
-		printf("\n\n\n--------------- File exists! %s -----------------\n\n\n", u);
+		printf("\n\n\n--------------- FILE EXISTS! %s -----------------\n\n\n", u);
 		do
 		{
 			memset(data_buffer,'\0',sizeof(data_buffer));
@@ -132,6 +185,18 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 		return;
 	}
 
+	FILE *fd_cache = fopen("cache.txt", "a");
+	char cache_data[100];
+	bzero( cache_data, sizeof(cache_data));
+	if(u != NULL && timestamp_req_func != 0)
+	{
+		sprintf(cache_data,"site:%s ip:%s time:%ld\n",u,addr,timestamp_req);
+		printf("cache_data -->%s\n", cache_data);
+		int cache_write_bytes = fwrite(cache_data , 1 , strlen(cache_data) , fd_cache );
+	}
+	fclose(fd_cache);
+//	printf("\n\n cache_write_bytes --> %d\n", cache_write_bytes);
+
 	if (req_url != 0)
 	{
 		sprintf(msg_from_proxy,"GET /%s %s\r\nHost: %s\r\nConnection: close\r\n\r\n",req_url,version,request_url);
@@ -142,7 +207,7 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	}
 	printf("message--> %s\n", msg_from_proxy);
   printf("\n\nCreating socket\n\n");
-	struct sockaddr_in server_addr_proxy;
+	//struct sockaddr_in server_addr_proxy;
 	socket_server_proxy = socket(AF_INET,SOCK_STREAM,0);
 	if (socket_server_proxy < 0)
 	{
@@ -152,10 +217,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	setsockopt(socket_server_proxy, SOL_SOCKET,SO_REUSEADDR,&tv,sizeof(tv));
 	// Defining attributes for so socket
 	server_addr_proxy.sin_family = AF_INET;
-	printf("REACHED HERE3\n");
-	printf("\n\nproxy memcpy %s \n value %d\n\n", lh->h_addr, lh->h_length);
-  memcpy(&server_addr_proxy.sin_addr,lh->h_addr,lh->h_length);
-	printf("\n\nproxy memcpy done\n\n");
   server_addr_proxy.sin_port = htons(80);
 
 	//connect
@@ -326,19 +387,6 @@ void webserver_handler(int socket_connection_id)
 					connection_flag = 1;
 				}
 
-				//printf("md --->> %s\n", md);
-/*
-				printf("request_method %s\n", request_method);
-				printf("request_url %s\n", request_url);
-				printf("request_version %s\n", request_version);
-				printf("connection %s\n", connection);*/
-
-				// After receiving a request, create a thread using fork. This is done for
-				// handling multiple requests from the client.
-	  		//child_thread = fork();
-
-		//if (child_thread == 0)
-		//{
 				if (strcmp(request_method,"GET") == 0)
 				{
 					get_request(socket_connection_id,request_url,request_version,connection);
@@ -361,20 +409,22 @@ void webserver_handler(int socket_connection_id)
 		//exit(1);
 }
 
-
-
-
 int main(int argc, char * argv[])
 {
-
   char buffer[256];
 	char received_buffer[1024];
   struct sockaddr_in server_addr,client_addr;
   pid_t child_thread;
-
+	timeout_cache = atoi(argv[2]);
 	struct timeval tv;
 	tv.tv_sec = 10;
 	tv.tv_usec = 0;
+
+	// clear cache file
+	system("rm cache.txt");
+	FILE *fr = fopen("cache.txt","w");
+	fclose(fr);
+
 	// Create socket server
 	socket_server = socket(AF_INET,SOCK_STREAM,0);
 	if(!(socket_server))
