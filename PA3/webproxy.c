@@ -48,11 +48,14 @@ char* md5sum_calculate(char *name, int name_size)
 	return md5string;
 }
 
-void cache_timeout(long double t)
+void cache_timeout(int t)
 {
 	printf("\n\n@@@@@Entered cache loop@@@@@\n\n");
 	time_t timestamp;
 	time(&timestamp);
+	printf("time current --> %ld\n", timestamp);
+	printf("time req --> %ld\n", t);
+	printf("time duff --> %ld\n", timestamp-t);
 	if ((timestamp-t) >= timeout_cache)
 	{
 		char *cmd = "cd ~/Documents/Network\\ systems/ECEN5273/PA3/cache;rm *.html";
@@ -153,22 +156,25 @@ while(!feof(fd_read)){
 	fgets(line,200,fd_read);
 }
 
-printf("\nline %s length : %ld\n",line,strlen(line));
-
-char *line_value;
+char *line_value, *line_site;
 line_value = line;
+line_site = line;
 printf("\n\n\n\n\nLINE VALUE IS: %s\n\n\n\n\n",line_value);
-char* token = strstr(line_value,"time:");
-token = token + 5;
+char* token_time = strstr(line_value,"time:");
+token_time = token_time + 5;
 char* token_ip = strstr(line_value,"ip:");
 strcpy(strchr(token_ip,' '),"\0");
 token_ip = token_ip + 3;
-printf("token ----->>>>>>>>>>>%s\n", token);
+char* token_site = strstr(line_site,"site:");
+strcpy(strchr(token_site,' '),"\0");
+token_site = token_site + 5;
+printf("token ----->>>>>>>>>>>%s\n", token_time);
 printf("token ----->>>>>>>>>>>%s\n", token_ip);
-}
-fclose(fd_read);
+printf("token ----->>>>>>>>>>>%s\n", token_site);
 
-	cache_timeout(timestamp_req_func);
+fclose(fd_read);
+cache_timeout(atoi(token_time));
+}
 	time(&timestamp_req);
 	timestamp_req_func = timestamp_req;
 
@@ -191,6 +197,17 @@ fclose(fd_read);
 		sprintf(u,"./cache/%s%s.html",md,md_req);
 	}
 
+	FILE *fd_cache = fopen("cache.txt", "a");
+	char cache_data[100];
+	bzero( cache_data, sizeof(cache_data));
+	printf("u --->> %s ******** timestamp_req_func --->> %ld\n", u, timestamp_req_func);
+	if(u != NULL && timestamp_req_func != 0)
+	{
+		sprintf(cache_data,"site:%s ip:%s time:%ld\n",u,addr,timestamp_req);
+		printf("cache_data -->%s\n", cache_data);
+		int cache_write_bytes = fwrite(cache_data , 1 , strlen(cache_data) , fd_cache );
+	}
+	fclose(fd_cache);
 
 	int num_bytes;
 	FILE* fp = fopen(u,"r");
@@ -201,7 +218,8 @@ fclose(fd_read);
 	}
 	else
 	{
-		printf("\n\n\n--------------- FILE EXISTS! %s -----------------\n\n\n", u);
+		printf("\n\n\n--------------- FILE EXISTS! %s -----------------\n", u);
+		printf("----------------------------- RETRIEVING IP %s FROM CACHE MEMORY ------------------------------\n", addr);
 		do
 		{
 			memset(data_buffer,'\0',sizeof(data_buffer));
@@ -217,16 +235,7 @@ fclose(fd_read);
 		return;
 	}
 
-	FILE *fd_cache = fopen("cache.txt", "a");
-	char cache_data[100];
-	bzero( cache_data, sizeof(cache_data));
-	if(u != NULL && timestamp_req_func != 0)
-	{
-		sprintf(cache_data,"site:%s ip:%s time:%ld\n",u,addr,timestamp_req);
-		printf("cache_data -->%s\n", cache_data);
-		int cache_write_bytes = fwrite(cache_data , 1 , strlen(cache_data) , fd_cache );
-	}
-	fclose(fd_cache);
+
 //	printf("\n\n cache_write_bytes --> %d\n", cache_write_bytes);
 
 	if (req_url != 0)
