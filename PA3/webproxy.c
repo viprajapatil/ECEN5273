@@ -34,6 +34,12 @@ char error_header[] =
 "<!DOCTYPE html>\r\n"
 "<body><center><h1>ERROR 403 FORBIDDEN</h1><br>\r\n";
 
+char error_header_block[] =
+"HTTP/1.1 500 Internal Server Error\r\n"
+"Content-Type: text/html; charset = UTF-8\r\n\r\n"
+"<!DOCTYPE html>\r\n"
+"<body><center><h1>ERROR 403 FORBIDDEN</h1><br>\r\n";
+
 char* md5sum_calculate(char *name, int name_size)
 {
 	unsigned char digest[16];
@@ -114,7 +120,7 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 		if (ret != NULL)
 		{
 			printf("\nERROR: Blocked Website\n");
-			write(accept_var, error_header, strlen(error_header));
+			write(accept_var, error_header_block, strlen(error_header_block));
 			return;
 		}
 	}
@@ -433,13 +439,17 @@ void webserver_handler(int socket_connection_id)
 				}
 	    	else
 				{
-					int write_var = send(socket_connection_id,error_header,strlen(error_header),0);
-					if (write_var < 0)
-					{
-						perror("ERROR writing to socket");
-					}
+					printf("entered Else loop......\n");
+					// int write_var = send(socket_connection_id,error_header,strlen(error_header),0);
+					// if (write_var < 0)
+					// {
+					// 	perror("ERROR writing to socket");
+					// }
+					write(socket_connection_id, error_header, strlen(error_header));
+					close(socket_connection_id);
+					return;
 					//shutdown(socket_connection_id,SHUT_RDWR);
-				  close(accept_var[i]);
+
 				}
 				printf("\nconnection flag  %i\n", connection_flag);
 		}while(connection_flag);
