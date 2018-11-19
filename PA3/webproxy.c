@@ -440,18 +440,10 @@ void webserver_handler(int socket_connection_id)
 	    	else
 				{
 					printf("entered Else loop......\n");
-					// int write_var = send(socket_connection_id,error_header,strlen(error_header),0);
-					// if (write_var < 0)
-					// {
-					// 	perror("ERROR writing to socket");
-					// }
-					write(socket_connection_id, error_header, strlen(error_header));
-					close(socket_connection_id);
-					return;
-					//shutdown(socket_connection_id,SHUT_RDWR);
-
+					int write_bytes = write(socket_connection_id, error_header, strlen(error_header));
+					printf("write bytes -- > %d\n", write_bytes);
+					break;
 				}
-				printf("\nconnection flag  %i\n", connection_flag);
 		}while(connection_flag);
 		shutdown(socket_connection_id,SHUT_RDWR);
 		close(socket_connection_id);
@@ -523,7 +515,7 @@ while(1)
 	{
 		webserver_handler(accept_var[i]);
 		printf("exited handler...\n");
-		//close(socket_server);
+		close(socket_server);
 		exit(0);
 	}
 	else
