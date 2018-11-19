@@ -32,7 +32,7 @@ char error_header[] =
 "HTTP/1.1 500 Internal Server Error\r\n"
 "Content-Type: text/html; charset = UTF-8\r\n\r\n"
 "<!DOCTYPE html>\r\n"
-"<body><center><h1>ERROR 500: Internal Server Error</h1><br>\r\n";
+"<body><center><h1>ERROR 403 FORBIDDEN</h1><br>\r\n";
 
 char* md5sum_calculate(char *name, int name_size)
 {
@@ -84,7 +84,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 //	printf("requested url is: %s\n", request_url);
 	request_url = strstr(request_url,"//");
 	request_url = request_url + 2;
-//	printf("requested url is: %s\n", request_url);
 	strcpy(complete_path,request_url);
 	strcpy(cache_file_path,complete_path);
 
@@ -98,6 +97,28 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	memcpy(&server_addr_proxy.sin_addr,lh->h_addr,lh->h_length);
 	addr = inet_ntoa(server_addr_proxy.sin_addr);
 	printf("addr --->  %s\n", addr);
+	printf("addr --->  %s\n", lh->h_addr);
+	char *request_url_ptr = request_url;
+
+	//struct hostent *lh_s = gethostbyname(request_url);
+
+	//For blocking
+	char* ret;
+	FILE *block_fd  = fopen("blocked.txt","r");
+	char line_block[1000];
+	while(!feof(block_fd)){
+		fgets(line_block,200,block_fd);
+		line_block[strlen(line_block)-1] = '\0';
+		ret = strstr(request_url_ptr,line_block);
+		printf("ret -----====>>>> %s request_url %s line_block %s line length %ld \n", ret, request_url_ptr, line_block, strlen(line_block));
+		if (ret != NULL)
+		{
+			printf("\nERROR: Blocked Website\n");
+			write(accept_var, error_header, strlen(error_header));
+			return;
+		}
+	}
+	fclose(block_fd);
 
 	content_type = strchr(request_url, '.');
 // parsing the requested data for getting content type
