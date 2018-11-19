@@ -115,13 +115,13 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	char cache_read_buffer[1024*1024];
 	memset(cache_read_buffer,'\0',sizeof(cache_read_buffer));
 	// open cache_data
-	FILE* fd_read;
+	/*FILE* fd_read;
 	fd_read = fopen("cache.txt","r");
 
 	fseek (fd_read, 0, SEEK_END);
 	int size = ftell(fd_read);
 	fseek(fd_read,0,SEEK_SET);  /*reset the file pointer to start of file*/
-	printf("SIZE *********>>> %d\n", size);
+	/*printf("SIZE *********>>> %d\n", size);
 	if (size != 0)
 	{
 	char line[1000];
@@ -135,6 +135,38 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	printf("token ----->>>>>>>>>>>%s\n", token);
 	}
 	fclose(fd_read);
+*/
+
+// open cache_data
+FILE* fd_read;
+fd_read = fopen("cache.txt","r");
+
+fseek (fd_read, 0, SEEK_END);
+int size = ftell(fd_read);
+fseek(fd_read,0,SEEK_SET);  /*reset the file pointer to start of file*/
+printf("SIZE *********>>> %d\n", size);
+if (size != 0)
+{
+char line[1000];
+
+while(!feof(fd_read)){
+	fgets(line,200,fd_read);
+}
+
+printf("\nline %s length : %ld\n",line,strlen(line));
+
+char *line_value;
+line_value = line;
+printf("\n\n\n\n\nLINE VALUE IS: %s\n\n\n\n\n",line_value);
+char* token = strstr(line_value,"time:");
+token = token + 5;
+char* token_ip = strstr(line_value,"ip:");
+strcpy(strchr(token_ip,' '),"\0");
+token_ip = token_ip + 3;
+printf("token ----->>>>>>>>>>>%s\n", token);
+printf("token ----->>>>>>>>>>>%s\n", token_ip);
+}
+fclose(fd_read);
 
 	cache_timeout(timestamp_req_func);
 	time(&timestamp_req);
