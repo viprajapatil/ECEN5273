@@ -1,6 +1,6 @@
 /*
 @file webproxy.c
-@desc
+@author Vipraja Patil
 */
 
 #include <stdio.h>
@@ -27,19 +27,21 @@ int timeout_cache =0;
 long double timestamp_req_func;
 time_t timestamp_req;
 int req_count = 0;
+
 // Define error header
 char error_header[] =
 "HTTP/1.1 500 Internal Server Error\r\n"
 "Content-Type: text/html; charset = UTF-8\r\n\r\n"
 "<!DOCTYPE html>\r\n"
 "<body><center><h1>ERROR 403 FORBIDDEN</h1><br>\r\n";
-
+// Error header for blocked websites
 char error_header_block[] =
 "HTTP/1.1 500 Internal Server Error\r\n"
 "Content-Type: text/html; charset = UTF-8\r\n\r\n"
 "<!DOCTYPE html>\r\n"
 "<body><center><h1>ERROR 403 FORBIDDEN</h1><br>\r\n";
 
+// Calculates MD5 hash value for caching and searching
 char* md5sum_calculate(char *name, int name_size)
 {
 	unsigned char digest[16];
@@ -54,6 +56,7 @@ char* md5sum_calculate(char *name, int name_size)
 	return md5string;
 }
 
+// Clears cache after a certain timeout value
 void cache_timeout(int t)
 {
 	printf("\n\n@@@@@Entered cache loop@@@@@\n\n");
@@ -71,7 +74,7 @@ void cache_timeout(int t)
 }
 
 /*
-@brief
+@brief Completes GET request
 */
 void get_request(int accept_var, char request_url[], char version[], char connection[])
 {
@@ -164,7 +167,6 @@ while(!feof(fd_read)){
 char *line_value, *line_site;
 line_value = line;
 line_site = line;
-printf("\n\n\n\n\nLINE VALUE IS: %s\n\n\n\n\n",line_value);
 char* token_time = strstr(line_value,"time:");
 token_time = token_time + 5;
 char* token_ip = strstr(line_value,"ip:");
@@ -173,10 +175,6 @@ token_ip = token_ip + 3;
 char* token_site = strstr(line_site,"site:");
 strcpy(strchr(token_site,' '),"\0");
 token_site = token_site + 5;
-printf("token ----->>>>>>>>>>>%s\n", token_time);
-printf("token ----->>>>>>>>>>>%s\n", token_ip);
-printf("token ----->>>>>>>>>>>%s\n", token_site);
-
 fclose(fd_read);
 cache_timeout(atoi(token_time));
 }
@@ -202,14 +200,13 @@ cache_timeout(atoi(token_time));
 		sprintf(u,"./cache/%s%s.html",md,md_req);
 	}
 
+	// Saves url, ip address of the url and request time in a file 
 	FILE *fd_cache = fopen("cache.txt", "a");
 	char cache_data[100];
 	bzero( cache_data, sizeof(cache_data));
-	printf("u --->> %s ******** timestamp_req_func --->> %ld\n", u, timestamp_req_func);
 	if(u != NULL && timestamp_req_func != 0)
 	{
 		sprintf(cache_data,"site:%s ip:%s time:%ld\n",u,addr,timestamp_req);
-		printf("cache_data -->%s\n", cache_data);
 		int cache_write_bytes = fwrite(cache_data , 1 , strlen(cache_data) , fd_cache );
 	}
 	fclose(fd_cache);
