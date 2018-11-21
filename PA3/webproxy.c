@@ -59,18 +59,13 @@ char* md5sum_calculate(char *name, int name_size)
 // Clears cache after a certain timeout value
 void cache_timeout(int t)
 {
-	printf("\n\n@@@@@Entered cache loop@@@@@\n\n");
 	time_t timestamp;
 	time(&timestamp);
-	printf("time current --> %ld\n", timestamp);
-	printf("time req --> %ld\n", t);
-	printf("time duff --> %ld\n", timestamp-t);
 	if ((timestamp-t) >= timeout_cache)
 	{
 		char *cmd = "cd ~/Documents/Network\\ systems/ECEN5273/PA3/cache;rm *.html";
 		system(cmd);
 	}
-	printf("\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n\n");
 }
 
 /*
@@ -106,7 +101,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 	memcpy(&server_addr_proxy.sin_addr,lh->h_addr,lh->h_length);
 	addr = inet_ntoa(server_addr_proxy.sin_addr);
 	printf("addr --->  %s\n", addr);
-	printf("addr --->  %s\n", lh->h_addr);
 	char *request_url_ptr = request_url;
 
 	//struct hostent *lh_s = gethostbyname(request_url);
@@ -119,7 +113,6 @@ void get_request(int accept_var, char request_url[], char version[], char connec
 		fgets(line_block,200,block_fd);
 		line_block[strlen(line_block)-1] = '\0';
 		ret = strstr(request_url_ptr,line_block);
-		printf("ret -----====>>>> %s request_url %s line_block %s line length %ld \n", ret, request_url_ptr, line_block, strlen(line_block));
 		if (ret != NULL)
 		{
 			printf("\nERROR: Blocked Website\n");
@@ -155,7 +148,6 @@ fd_read = fopen("cache.txt","r");
 fseek (fd_read, 0, SEEK_END);
 int size = ftell(fd_read);
 fseek(fd_read,0,SEEK_SET);  /*reset the file pointer to start of file*/
-printf("SIZE *********>>> %d\n", size);
 if (size != 0)
 {
 char line[1000];
@@ -184,7 +176,6 @@ cache_timeout(atoi(token_time));
 	char msg_from_proxy[100];
 	char *req_url;
 	req_url = strtok(NULL, " ");
-//	printf("req url --> %s\n", req_url);
 
 	char u[1000];
 	char* ptr = complete_path;
@@ -238,8 +229,6 @@ cache_timeout(atoi(token_time));
 	}
 
 
-//	printf("\n\n cache_write_bytes --> %d\n", cache_write_bytes);
-
 	if (req_url != 0)
 	{
 		sprintf(msg_from_proxy,"GET /%s %s\r\nHost: %s\r\nConnection: close\r\n\r\n",req_url,version,request_url);
@@ -273,16 +262,14 @@ cache_timeout(atoi(token_time));
 	printf("sending %s\n", msg_from_proxy);
 	//send
  	int bytesSend = send(socket_server_proxy, msg_from_proxy, strlen(msg_from_proxy), 0);
-  //printf("bytesSend %d\n", bytesSend);
+ 
 	int readBuffer[BufferSize];
 	bzero( readBuffer, sizeof(readBuffer));
 	//RECEIVE
-	//printf("receiving.....\n");
 	int bytesReceived = 0;
 	FILE *fd;
 	char url_cache[100];
 		strcpy(url_cache ,complete_path);
-	//printf("\n\n\n\n\n\n\ncomplete file path is: %s\n\n\n\n\n\n", url_cache);
 
 	char* ptr_cache = url_cache;
 	char* md_cache = md5sum_calculate(ptr_cache, strlen(url_cache));
