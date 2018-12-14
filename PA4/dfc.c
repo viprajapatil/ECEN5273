@@ -22,6 +22,7 @@ int sockfd[100];
 struct sockaddr_in server_addr[100];
 char username[20];
 char password[20];
+int index_value[8];
 int i = 0;
 
 void get_conf_info()
@@ -101,12 +102,66 @@ void connect_to_servers()
       }
     }
 
+
+/*
+Calculate md5sum of the file
+*/
+int md5sum(char *filename)
+{
+    char md5value[100];
+    char md5_command[100];
+    sprintf(md5_command,"md5sum %s",filename);
+    FILE *f = popen(md5_command, "r");
+    while (fgets(md5value, 100, f) != NULL) {
+        strtok(md5value,"  \t\n");
+    }
+    pclose(f);
+    return atoi(md5value);
+}
+
+/*
+According to the index value send files to fifferent servers
+*/
+void hashtable(int index)
+{
+    if (index == 0)
+    {
+        int filename_index[8] = {1,2,2,3,3,4,4,1};
+        for(int i=0; i<8; i++)
+          index_value[i] = filename_index[i];
+    }
+    else if (index == 1)
+    {
+        int filename_index[8] = {4,1,1,2,2,3,3,4};
+        for(int i=0; i<8; i++)
+          index_value[i] = filename_index[i];
+    }
+    else if (index == 2)
+    {
+        int filename_index[8] = {3,4,4,1,1,2,2,3};
+        for(int i=0; i<8; i++)
+          index_value[i] = filename_index[i];
+    }
+    else
+    {
+        int filename_index[8] = {2,3,3,4,4,1,1,2};
+        for(int i=0; i<8; i++)
+          index_value[i] = filename_index[i];
+    }
+}
+
 /*
 Put a file into 4 dfs servers
 */
-void put_file()
+void put_file(char *filename)
 {
-    //
+    int modvalue = md5sum(filename);
+    modvalue = modvalue%4;
+    hashtable(modvalue);
+    char cmd[100];
+    FILE *f = fopen(filename, "r");
+    
+    
 }
 
 void get_file()
@@ -117,6 +172,7 @@ void get_file()
 int main(int argc, char **argv)
 {
     char command[100];
+    char *filename;
     if (argc < 2)
     {
         printf("Less args <dfc config file>");
@@ -142,15 +198,13 @@ int main(int argc, char **argv)
 
     if (strstr(command,"get") != NULL)
     {
-      printf("s1-> %s",command);
+      filename = strstr(command, " ");
 
-        //call get function
-        printf("get called!/n\n");
     }
     else if (strstr(command,"put") != NULL)
     {
-        //call put function
-        printf("put called!/n\n");
+        filename = strstr(command, " ");
+        put_file(filename);
     }
     else if (strstr(command, "list") != NULL)
     {
