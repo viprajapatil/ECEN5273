@@ -67,6 +67,9 @@ int main(int argc, char **argv)
         printf("Less args <directory> <portno>\n");
         exit(-1);
     }
+    char cmd[100];
+    sprintf(cmd,"mkdir -p %s", argv[1]);
+    system(cmd);
     socket_server = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_server < 0)
     {
