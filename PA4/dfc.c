@@ -20,6 +20,8 @@
 int dfs_server_port[4];
 int sockfd[100];
 struct sockaddr_in server_addr[100];
+char username[20];
+char password[20];
 int i = 0;
 
 void get_conf_info()
@@ -39,19 +41,20 @@ void get_conf_info()
           char *s = strstr(line, ":");
           char *st = strtok(s,":");
           dfs_server_port[i] = atoi(st);
-          printf("DFS is running at port-> %d\n", dfs_server_port[i]);
+        //  printf("DFS is running at port-> %d\n", dfs_server_port[i]);
           i++;
       }
       if (strstr(line, "Username") != NULL)
       {
           char *s = strstr(line, " ");
           char *st = strtok(s," ");
-          printf("Username-> %s\n", st);
+          strcpy(username,st);
       }
       if (strstr(line, "Password") != NULL)
       {
           char *s = strstr(line, " ");
           char *st = strtok(s," ");
+          strcpy(password,st);
       }
   }
   fclose(fr);
@@ -65,7 +68,7 @@ void connect_to_servers()
         struct timeval timeout;
 	      timeout.tv_sec = 1;
 	      timeout.tv_usec = 0;
-        printf("port number->  %d\n", dfs_server_port[i]);
+      //  printf("port number->  %d\n", dfs_server_port[i]);
         bzero(&server_addr[i],sizeof(server_addr[i]));               //zero the struct
         server_addr[i].sin_family = AF_INET;                 //address family
         server_addr[i].sin_port = htons(dfs_server_port[i]);      //sets port to network byte order
@@ -83,15 +86,37 @@ void connect_to_servers()
 			       close(sockfd[i]);
 			       return;
 	      }
-        printf("Sucessful connection! %d\n", dfs_server_port[i]);
+
+        char authen[100];
+        sprintf(authen,"%s %s",username,password);
+        int nbytes = send(sockfd[i], authen, strlen(authen), 0);
+        if (nbytes < 0){
+          printf("nbytes-> %d\n", nbytes);
+        }
+        else printf("nbytes-> %d\n", nbytes);
+
+
+        printf("Sucessful connection for port %d \n", dfs_server_port[i]);
 	      //setsockopt (sockfd[i], SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout);
       }
     }
 
+/*
+Put a file into 4 dfs servers
+*/
+void put_file()
+{
+    //
+}
 
+void get_file()
+{
+    //
+}
 
 int main(int argc, char **argv)
 {
+    char command[100];
     if (argc < 2)
     {
         printf("Less args <dfc config file>");
@@ -103,6 +128,36 @@ int main(int argc, char **argv)
     //connect to all the 4 servers
     connect_to_servers();
 
+
     //take command type as input
+    printf("Enter command: ");
+    scanf("%[^\t\n]s", command);
+    for (int i=0; i<4; i++)
+    {
+      int nbytes = send(sockfd[i], command, strlen(command), 0);
+      if (nbytes < 0){
+        printf("nbytes-> %d\n", nbytes);
+      }
+    }
+
+    if (strstr(command,"get") != NULL)
+    {
+      printf("s1-> %s",command);
+
+        //call get function
+        printf("get called!/n\n");
+    }
+    else if (strstr(command,"put") != NULL)
+    {
+        //call put function
+        printf("put called!/n\n");
+    }
+    else if (strstr(command, "list") != NULL)
+    {
+        //call list function
+        printf("list called!/n\n");
+    }
+    else printf("Entered wrong command, enter -> list, get or put\n");
+
     return 0;
 }
