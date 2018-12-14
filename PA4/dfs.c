@@ -25,11 +25,43 @@ int socket_server,accept_var[100], socket_server_proxy;
 struct sockaddr_in server_addr, client_addr;
 int i = 0;
 
+int authenticate_credentials(char buffer[])
+{
+  char *username_c;
+  char *password_c;
+  char *username = strtok(buffer, " ");
+  char *password = strstr(buffer, " ");
+  password = strtok(NULL, "");
+
+  FILE *fr = fopen("dfs.conf","r");
+  if (fr == NULL)
+  {
+      perror("Unable to open conf file:");
+      exit(-1);
+  }
+  char line[1000];
+  while(fgets(line, 200, fr) !=  NULL)
+  {
+      line[strlen(line)-1] = '\0';
+      username_c = strtok(line, " ");
+      password_c = strstr(line, " ");
+      password_c = strtok(NULL, "");
+      if (strcmp(username,username_c) == 0 && strcmp(password, password_c) == 0)
+      {
+        printf("Authentication completed!\n");
+        return 0;
+      }
+  }
+  return 1;
+}
+
 
 int main(int argc, char **argv)
 {
+    struct timeval tv;
     int socket_server;
-    int port = atoi(argv[1]);
+    int port = atoi(argv[2]);
+    printf("port %d\n", port);
     if (argc < 3)
     {
         printf("Less args <directory> <portno>\n");
@@ -41,6 +73,7 @@ int main(int argc, char **argv)
         perror("Error creating the socket");
         exit(-1);
     }
+    setsockopt(socket_server, SOL_SOCKET,SO_REUSEADDR,&tv,sizeof(tv));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
@@ -63,5 +96,22 @@ int main(int argc, char **argv)
 		     close(accept_var[i]);
     }
     else printf("Accept complete\n");
+    char buffer[100];
+    int n = recv(accept_var[i], buffer, sizeof(buffer), 0);
+
+    // Authenticate credentials
+    int a = authenticate_credentials(buffer);
+    if (a == 1)
+    {
+        printf("Authentication failed\n");
+        close(accept_var[i]);
+    }
+
+    bzero(buffer, sizeof(buffer));
+    // Receive command from client
+    n = recv(accept_var[i], buffer, sizeof(buffer), 0);
+    printf("command-> %s", buffer);
+
+
     return 0;
 }
