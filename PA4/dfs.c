@@ -24,6 +24,7 @@ int server_num;
 int socket_server,accept_var[100], socket_server_proxy;
 struct sockaddr_in server_addr, client_addr;
 int i = 0;
+char directory[100];
 
 int authenticate_credentials(char buffer[])
 {
@@ -54,12 +55,39 @@ int authenticate_credentials(char buffer[])
   }
   return 1;
 }
+void put_file()
+{
+    char file_ext[100], file_path[100];
+    char buffer[1000];
+    int n;
+    for(int i=0; i<2; i++)
+    {
+    //receive 2 files from the client and store it in subfolder
+    bzero(file_ext, sizeof(file_ext));
+    bzero(file_path, sizeof(file_path));
+    // Receive command from client
+    n = recv(accept_var[0], file_ext, sizeof(file_ext), 0);
+    printf("file ext rec-> %s\n", file_ext);
+    bzero(buffer, sizeof(buffer));
+    sleep(1);
+    // Receive command from client
+    n = recv(accept_var[0], buffer, sizeof(buffer), 0);
+    printf("\ncontent-> %s   n-> %d\n", buffer, n);
+
+    sprintf(file_path,".%s/%s",directory,file_ext);
+    printf("file ext-> %s\n", file_path);
+    FILE *f1 = fopen(file_path,"w");
+    fwrite(buffer,1,n,f1);
+    fclose(f1);
+    }
+}
 
 
 int main(int argc, char **argv)
 {
     struct timeval tv;
     int socket_server;
+    char *filename;
     int port = atoi(argv[2]);
     printf("port %d\n", port);
     if (argc < 3)
@@ -67,6 +95,7 @@ int main(int argc, char **argv)
         printf("Less args <directory> <portno>\n");
         exit(-1);
     }
+    sprintf(directory,"/%s",argv[1]);
     char cmd[100];
     sprintf(cmd,"mkdir -p %s", argv[1]);
     system(cmd);
@@ -115,6 +144,26 @@ int main(int argc, char **argv)
     n = recv(accept_var[i], buffer, sizeof(buffer), 0);
     printf("command-> %s", buffer);
 
+  /*  n = recv(accept_var[i], buffer, sizeof(buffer), 0);
+    printf("command-> %s", buffer);*/
+
+    if (strstr(buffer,"get") != NULL)
+    {
+      filename = strstr(buffer, " ");
+      filename++;
+    }
+    else if (strstr(buffer,"put") != NULL)
+    {
+        filename = strstr(buffer, " ");
+        filename++;
+        put_file();
+    }
+    else if (strstr(buffer, "list") != NULL)
+    {
+        //call list function
+        printf("list called!/n\n");
+    }
+    else printf("Entered wrong command\n");
 
     return 0;
 }
