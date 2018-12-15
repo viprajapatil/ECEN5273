@@ -29,7 +29,7 @@ int i = 0;
 
 void get_conf_info()
 {
-  FILE *fr = fopen("dfc.conf","r");
+  FILE *fr = fopen(conf,"r");
   char line[1000];
   if (fr == NULL)
   {
@@ -271,7 +271,6 @@ void get_file()
 int main(int argc, char **argv)
 {
     char command[100];
-    char subfolder[100];
     char *filename;
     if (argc < 3)
     {
