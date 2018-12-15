@@ -28,14 +28,23 @@ char directory[100];
 
 int authenticate_credentials(char buffer[])
 {
+  char subb[100];
+  sprintf(subb,"%s",buffer);
   char *username_c;
   char *password_c;
-  char *subfolder;
   char *username = strtok(buffer, " ");
   char *password = strstr(buffer, " ");
   password = strtok(NULL, "");
   password = strtok(password, " ");
 
+  char *sub;
+  sub = strtok(subb," ");
+  sub = strtok(NULL, " ");
+  sub = strtok(NULL, " ");
+  char cmdsub[100];
+  bzero(cmdsub,sizeof(cmdsub));
+  sprintf(cmdsub,"mkdir -p %s/%s/%s",directory,username,sub);
+  sprintf(directory,"%s/%s/%s",directory,username,sub);
   FILE *fr = fopen("dfs.conf","r");
   if (fr == NULL)
   {
@@ -49,13 +58,12 @@ int authenticate_credentials(char buffer[])
       username_c = strtok(line, " ");
       password_c = strstr(line, " ");
       password_c = strtok(NULL, "");
-      subfolder = strstr(password_c, " ");
-      subfolder = strtok(subfolder, " ");
       password_c = strtok(password_c, " ");
     //  printf("%s %s %s\n", username_c, password_c, subfolder);
       if (strcmp(username,username_c) == 0 && strcmp(password, password_c) == 0)
       {
         printf("Authentication completed!\n");
+        system(cmdsub);
         return 0;
       }
   }
@@ -81,7 +89,7 @@ void put_file()
     n = recv(accept_var[0], buffer, sizeof(buffer), 0);
     printf("\ncontent-> %s   n-> %d\n", buffer, n);
 
-    sprintf(file_path,".%s/%s",directory,file_ext);
+    sprintf(file_path,"./%s/%s",directory,file_ext);
     printf("file ext-> %s\n", file_path);
     FILE *f1 = fopen(file_path,"w");
     fwrite(buffer,1,n,f1);
@@ -102,7 +110,7 @@ int main(int argc, char **argv)
         printf("Less args <directory> <portno>\n");
         exit(-1);
     }
-    sprintf(directory,"/%s",argv[1]);
+    sprintf(directory,"%s",argv[1]);
     char cmd[100];
     sprintf(cmd,"mkdir -p %s", argv[1]);
     system(cmd);
@@ -137,7 +145,7 @@ int main(int argc, char **argv)
     else printf("Accept complete\n");
     char buffer[100];
     int n = recv(accept_var[i], buffer, sizeof(buffer), 0);
-
+    printf("%s\n", buffer);
     // Authenticate credentials
     int a = authenticate_credentials(buffer);
     if (a == 1)
@@ -150,6 +158,7 @@ int main(int argc, char **argv)
     // Receive command from client
     n = recv(accept_var[i], buffer, sizeof(buffer), 0);
     printf("command-> %s\n", buffer);
+
 
   /*  n = recv(accept_var[i], buffer, sizeof(buffer), 0);
     printf("command-> %s", buffer);*/
