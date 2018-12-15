@@ -98,6 +98,21 @@ void put_file()
 }
 
 
+
+
+void get_file()
+{
+    char sample[100];
+    //send all files to client
+    int n = recv(accept_var[0], sample, sizeof(sample), 0);
+    n = send(accept_var[0], sample, sizeof(sample), 0);
+
+}
+
+
+
+
+
 int main(int argc, char **argv)
 {
     struct timeval tv;
@@ -167,6 +182,7 @@ int main(int argc, char **argv)
     {
       filename = strstr(buffer, " ");
       filename++;
+      get_file();
     }
     else if (strstr(buffer,"put") != NULL)
     {
