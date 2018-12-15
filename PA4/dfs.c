@@ -100,12 +100,49 @@ void put_file()
 
 
 
-void get_file()
+void get_file(char *filename)
 {
     char sample[100];
+    char cmd[100];
+    char line[100];
     //send all files to client
     int n = recv(accept_var[0], sample, sizeof(sample), 0);
-    n = send(accept_var[0], sample, sizeof(sample), 0);
+    char file[100];
+    sprintf(cmd,"cd %s;ls -la",directory);
+    FILE *f = popen(cmd, "r");
+    while (fgets(line, 100, f) != NULL) {
+        bzero(file,sizeof(file));
+        sprintf(file,".%s",filename);
+        char *fw = strstr(line,file);
+        fw = strtok(fw,"\n");
+        if (fw != NULL)
+        {
+            bzero(file,sizeof(file));
+            sprintf(file,"./%s/%s",directory,fw);
+            FILE *fs = fopen(file,"rb");
+            if (fs == NULL)
+            {
+              perror("fopen error:");
+            }
+            char filename_get[100];
+            bzero(filename_get,sizeof(filename_get));
+            sprintf(filename_get,"%s",fw);
+            n = send(accept_var[0], filename_get, sizeof(filename_get), 0);
+            fseek(fs, 0, SEEK_END); // seek to end of file
+            int size = ftell(fs); // get current file pointer
+            fseek(fs, 0, SEEK_SET); // seek back to beginning of file
+            char buffer[size];
+            memset(buffer,'\0',sizeof(buffer));
+            fread(buffer,size,1,fs);
+            fclose(fs);
+            printf("\n%s\n", buffer);
+            n = send(accept_var[0], buffer, size, 0);
+            printf("n send->%d\n", n);
+            sleep(1);
+        }
+    }
+    pclose(f);
+
 
 }
 
@@ -116,6 +153,8 @@ void get_file()
 int main(int argc, char **argv)
 {
     struct timeval tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
     int socket_server;
     char *filename;
     int port = atoi(argv[2]);
@@ -182,7 +221,7 @@ int main(int argc, char **argv)
     {
       filename = strstr(buffer, " ");
       filename++;
-      get_file();
+      get_file(filename);
     }
     else if (strstr(buffer,"put") != NULL)
     {
