@@ -255,8 +255,21 @@ void get_file()
     for(int i=0; i<4; i++)
     {
         nbytes = send(sockfd[i], ser, sizeof(ser), 0);
-        nbytes = recv(sockfd[i], server_data, sizeof(server_data), 0);
-        printf("nbytes->%s\n", server_data);
+        for(int j=0; j<2; j++)
+        {
+          char filename_get[100];
+          bzero(filename_get,sizeof(filename_get));
+          nbytes = recv(sockfd[i], filename_get, sizeof(filename_get), 0);
+          printf("file rec->%s",filename_get);
+          nbytes = recv(sockfd[i], server_data, sizeof(server_data), 0);
+          printf("nbytes->%d\n", nbytes);
+          char d[10];
+          sprintf(d,"file%d%d",i,j);
+          FILE *f = fopen(d,"wb");
+          fwrite(server_data,1,nbytes,f);
+          fclose(f);
+
+        }
     }
 }
 
