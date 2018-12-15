@@ -155,13 +155,110 @@ Put a file into 4 dfs servers
 */
 void put_file(char *filename)
 {
+  FILE *f = fopen(filename, "r");
+  printf("filename-> %s\n", filename);
+  if(f==NULL)
+      perror("error on file open:\n");
     int modvalue = md5sum(filename);
     modvalue = modvalue%4;
     hashtable(modvalue);
+    printf("mod-> %d\n", modvalue);
     char cmd[100];
-    FILE *f = fopen(filename, "r");
-    
-    
+    fseek(f, 0, SEEK_END); // seek to end of file
+    int size = ftell(f); // get current file pointer
+    fseek(f, 0, SEEK_SET); // seek back to beginning of file
+
+    // divide in 4 parts
+    int send_size = size/4;
+    int last_size = size - (send_size*3);
+    printf("peice ->%d, last ->%d\n", send_size, last_size);
+
+    // Divide files in 4 parts and store in buffer
+    fseek(f,0,SEEK_SET); /*set file pointer to start of file*/
+    char buffer0[send_size];
+    memset(buffer0,'\0',send_size);
+    fread(buffer0,send_size,1,f);
+
+    fseek(f,send_size,SEEK_SET); /*set file pointer to start of file*/
+    char buffer1[send_size];
+    memset(buffer1,'\0',send_size);
+    fread(buffer1,send_size,1,f);
+
+    fseek(f,send_size*2,SEEK_SET); /*set file pointer to start of file*/
+    char buffer2[send_size];
+    memset(buffer2,'\0',send_size);
+    fread(buffer2,send_size,1,f);
+
+    fseek(f,send_size*3,SEEK_SET); /*set file pointer to start of file*/
+    char buffer3[last_size];
+    memset(buffer3,'\0',last_size);
+    fread(buffer3,last_size,1,f);
+    int c =0;
+    // send files to dfs servers
+  /*  for (int i=0; i<4; i++)
+    {
+
+    }*/
+    int nbytes;
+    char filename_ext[100];
+    char buffer_num[100];
+    int index = 0;
+    int count = 1;
+    for(int i=0; i<4; i++)
+    {
+        while(count<3)
+        {
+            bzero(filename_ext,sizeof(filename_ext));
+            sprintf(filename_ext,".%s.%d",filename,index_value[index]);
+            //printf("ext-> %s\n",filename_ext);
+            nbytes = send(sockfd[i], filename_ext, strlen(filename_ext), 0);
+            sleep(1);
+            //printf("nbytes ext->%d\n", nbytes);
+            if(index_value[index] == 1)
+            {   printf("entered %d loop...\n",index_value[index]);
+                nbytes = send(sockfd[i], buffer0, send_size, 0);
+            }
+            else if (index_value[index] == 2)
+            {
+              printf("entered %d loop...\n",index_value[index]);
+              nbytes = send(sockfd[i], buffer1, send_size, 0);
+            }
+            else if (index_value[index] == 3)
+            {
+                printf("entered %d loop...\n",index_value[index]);
+                nbytes = send(sockfd[i], buffer2, send_size, 0);
+            }
+            else
+            {
+                printf("entered %d loop...\n",index_value[index]);
+                nbytes = send(sockfd[i], buffer3, send_size, 0);
+            }
+            index++;
+            printf("nbytes content->%d\n", nbytes);
+
+            count++;
+            printf("\nserver->%d, file->%d\n", i,index_value[index]);
+
+        }
+        count = 1;
+        //printf("server->%d, file->%d\n", i,index_value[index]);
+    }
+
+    FILE *f1 = fopen("1","w");
+    FILE *f2 = fopen("2","w");
+    FILE *f3 = fopen("3","w");
+    FILE *f4 = fopen("4","w");
+    fwrite(buffer0,1,send_size,f1);
+    fwrite(buffer1,1,send_size,f2);
+    fwrite(buffer2,1,send_size,f3);
+    fwrite(buffer3,1,last_size,f4);
+    fclose(f);
+    fclose(f1);
+    fclose(f2);
+    fclose(f3);
+    fclose(f4);
+
+
 }
 
 void get_file()
@@ -199,11 +296,12 @@ int main(int argc, char **argv)
     if (strstr(command,"get") != NULL)
     {
       filename = strstr(command, " ");
-
+      filename++;
     }
     else if (strstr(command,"put") != NULL)
     {
         filename = strstr(command, " ");
+        filename++;
         put_file(filename);
     }
     else if (strstr(command, "list") != NULL)
