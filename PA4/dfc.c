@@ -22,6 +22,8 @@ int sockfd[100];
 struct sockaddr_in server_addr[100];
 char username[20];
 char password[20];
+char subfolder[20];
+char conf[50];
 int index_value[8];
 int i = 0;
 
@@ -89,7 +91,7 @@ void connect_to_servers()
 	      }
 
         char authen[100];
-        sprintf(authen,"%s %s",username,password);
+        sprintf(authen,"%s %s %s",username,password,subfolder);
         int nbytes = send(sockfd[i], authen, strlen(authen), 0);
         if (nbytes < 0){
           printf("nbytes-> %d\n", nbytes);
@@ -269,13 +271,16 @@ void get_file()
 int main(int argc, char **argv)
 {
     char command[100];
+    char subfolder[100];
     char *filename;
-    if (argc < 2)
+    if (argc < 3)
     {
-        printf("Less args <dfc config file>");
+        printf("Less args <dfc config file> <subfolder>");
         exit(-1);
     }
     printf("********** Welcome to DFC (client)! ***********\n");
+    sprintf(conf,"%s",argv[1]);
+    sprintf(subfolder,"%s",argv[2]);
     get_conf_info();
 
     //connect to all the 4 servers
