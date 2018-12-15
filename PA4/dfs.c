@@ -30,9 +30,11 @@ int authenticate_credentials(char buffer[])
 {
   char *username_c;
   char *password_c;
+  char *subfolder;
   char *username = strtok(buffer, " ");
   char *password = strstr(buffer, " ");
   password = strtok(NULL, "");
+  password = strtok(password, " ");
 
   FILE *fr = fopen("dfs.conf","r");
   if (fr == NULL)
@@ -47,12 +49,17 @@ int authenticate_credentials(char buffer[])
       username_c = strtok(line, " ");
       password_c = strstr(line, " ");
       password_c = strtok(NULL, "");
+      subfolder = strstr(password_c, " ");
+      subfolder = strtok(subfolder, " ");
+      password_c = strtok(password_c, " ");
+    //  printf("%s %s %s\n", username_c, password_c, subfolder);
       if (strcmp(username,username_c) == 0 && strcmp(password, password_c) == 0)
       {
         printf("Authentication completed!\n");
         return 0;
       }
   }
+  exit(-1);
   return 1;
 }
 void put_file()
@@ -142,7 +149,7 @@ int main(int argc, char **argv)
     bzero(buffer, sizeof(buffer));
     // Receive command from client
     n = recv(accept_var[i], buffer, sizeof(buffer), 0);
-    printf("command-> %s", buffer);
+    printf("command-> %s\n", buffer);
 
   /*  n = recv(accept_var[i], buffer, sizeof(buffer), 0);
     printf("command-> %s", buffer);*/
