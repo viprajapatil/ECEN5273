@@ -250,14 +250,14 @@ void put_file(char *filename)
 
 void get_file()
 {   int nbytes;
-    char ser[10] = "12";
+    char ser[10] = "random";
+    char filename_get[100];
     char server_data[1000];
     for(int i=0; i<4; i++)
     {
         nbytes = send(sockfd[i], ser, sizeof(ser), 0);
         for(int j=0; j<2; j++)
         {
-          char filename_get[100];
           bzero(filename_get,sizeof(filename_get));
           nbytes = recv(sockfd[i], filename_get, sizeof(filename_get), 0);
           printf("file rec->%s",filename_get);
@@ -265,11 +265,12 @@ void get_file()
           printf("nbytes->%d\n", nbytes);
           char d[10];
           sprintf(d,"file%d%d",i,j);
-          FILE *f = fopen(d,"wb");
+          FILE *f = fopen(filename_get,"wb");
           fwrite(server_data,1,nbytes,f);
           fclose(f);
-
         }
+        //merge_file(filename_get);
+        printf("file->%s\n", filename_get);
     }
 }
 
