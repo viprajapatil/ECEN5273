@@ -246,26 +246,18 @@ void put_file(char *filename)
         //printf("server->%d, file->%d\n", i,index_value[index]);
     }
 
-    FILE *f1 = fopen("1","w");
-    FILE *f2 = fopen("2","w");
-    FILE *f3 = fopen("3","w");
-    FILE *f4 = fopen("4","w");
-    fwrite(buffer0,1,send_size,f1);
-    fwrite(buffer1,1,send_size,f2);
-    fwrite(buffer2,1,send_size,f3);
-    fwrite(buffer3,1,last_size,f4);
-    fclose(f);
-    fclose(f1);
-    fclose(f2);
-    fclose(f3);
-    fclose(f4);
-
-
 }
 
 void get_file()
-{
-    //
+{   int nbytes;
+    char ser[10] = "12";
+    char server_data[1000];
+    for(int i=0; i<4; i++)
+    {
+        nbytes = send(sockfd[i], ser, sizeof(ser), 0);
+        nbytes = recv(sockfd[i], server_data, sizeof(server_data), 0);
+        printf("nbytes->%s\n", server_data);
+    }
 }
 
 int main(int argc, char **argv)
@@ -301,6 +293,7 @@ int main(int argc, char **argv)
     {
       filename = strstr(command, " ");
       filename++;
+      get_file();
     }
     else if (strstr(command,"put") != NULL)
     {
