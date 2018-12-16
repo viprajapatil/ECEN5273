@@ -157,7 +157,7 @@ Put a file into 4 dfs servers
 */
 void put_file(char *filename)
 {
-  FILE *f = fopen(filename, "r");
+  FILE *f = fopen(filename, "rb");
   printf("filename-> %s\n", filename);
   if(f==NULL)
       perror("error on file open:\n");
@@ -212,9 +212,11 @@ void put_file(char *filename)
         {
             bzero(filename_ext,sizeof(filename_ext));
             sprintf(filename_ext,".%s.%d",filename,index_value[index]);
-            //printf("ext-> %s\n",filename_ext);
+            printf("ext-> %s\n",filename_ext);
+            char buffer[5];
+            recv(sockfd[i],buffer,sizeof(buffer),0);
             nbytes = send(sockfd[i], filename_ext, strlen(filename_ext), 0);
-            sleep(1);
+            //sleep(2);
             //printf("nbytes ext->%d\n", nbytes);
             if(index_value[index] == 1)
             {   printf("entered %d loop...\n",index_value[index]);
@@ -233,7 +235,7 @@ void put_file(char *filename)
             else
             {
                 printf("entered %d loop...\n",index_value[index]);
-                nbytes = send(sockfd[i], buffer3, send_size, 0);
+                nbytes = send(sockfd[i], buffer3, last_size, 0);
             }
             index++;
             printf("nbytes content->%d\n", nbytes);
@@ -248,10 +250,30 @@ void put_file(char *filename)
 
 }
 
+
+char* merge_file(char file[])
+{
+    char *s1;
+    char *s2;
+    char *file_name;
+    file_name = strtok(file, ".");
+    s2 = strtok(NULL,".");
+    s1 = strtok(NULL,".");
+    *(file_name + strlen(file_name)) = '.';
+    *(file_name + strlen(file_name)-2) = '\0';
+    printf("*******%s********\n", file_name);
+    return file_name;
+}
+
+
+
+
 void get_file()
-{   int nbytes;
+{   int nbytes, h=0;
     char ser[10] = "random";
     char filename_get[100];
+    char *file_name;
+    char p[4][100];
     char server_data[1000];
     for(int i=0; i<4; i++)
     {
@@ -269,9 +291,20 @@ void get_file()
           fwrite(server_data,1,nbytes,f);
           fclose(f);
         }
-        //merge_file(filename_get);
-        printf("file->%s\n", filename_get);
+        file_name = merge_file(filename_get);
     }
+    char file_with_ext[100];
+    for (int i=1; i<=4; i++)
+    {
+      bzero(file_with_ext,sizeof(file_with_ext));
+      sprintf(file_with_ext,".%s.%d",file_name,i);
+      printf("file->%s\n", file_with_ext);
+      strcpy(p[i-1],file_with_ext);
+    }
+    char cmd_merge[200];
+    sprintf(cmd_merge,"cat %s %s %s %s > %s",p[0],p[1],p[2],p[3],file_name);
+    system(cmd_merge);
+
 }
 
 int main(int argc, char **argv)
