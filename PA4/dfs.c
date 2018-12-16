@@ -72,7 +72,7 @@ int authenticate_credentials(char buffer[])
 }
 
 
-void put_file()
+void put_file(int socket_connection_id)
 {
     char file_ext[100], file_path[100];
     char buffer[1000000];
@@ -83,15 +83,15 @@ void put_file()
     memset(file_ext,'\0', sizeof(file_ext));
     memset(file_path,'\0' ,sizeof(file_path));
     // Receive command from client
-    send(accept_var[0],"hello",5,0);
-    n = recv(accept_var[0], file_ext, sizeof(file_ext), 0);
+    send(socket_connection_id,"hello",5,0);
+    n = recv(socket_connection_id, file_ext, sizeof(file_ext), 0);
     printf("file ext rec-> %s\n", file_ext);
     bzero(buffer, sizeof(buffer));
     //sleep(1);
     // Receive command from client
     n = 1;
     while(n > 0){
-      n = recv(accept_var[0], buffer, sizeof(buffer), 0);
+      n = recv(socket_connection_id, buffer, sizeof(buffer), 0);
       if(n == 0)
       {
         break;
@@ -111,11 +111,13 @@ void put_file()
       break;
     }
 }
+shutdown(socket_connection_id,SHUT_RDWR);
+close(socket_connection_id);
 }
 
 
 
-void get_file(char *filename)
+void get_file(char *filename, int socket_connection_id)
 {
     char sample[10];
     char cmd[100];
@@ -143,8 +145,8 @@ void get_file(char *filename)
             bzero(filename_get,sizeof(filename_get));
             sprintf(filename_get,"%s",fw);
 
-            recv(accept_var[0], sample, 5, 0); //for sync
-            int n = send(accept_var[0], filename_get, sizeof(filename_get), 0);
+            recv(socket_connection_id, sample, 5, 0); //for sync
+            int n = send(socket_connection_id, filename_get, sizeof(filename_get), 0);
 
             fseek(fs, 0, SEEK_END); // seek to end of file
             int size = ftell(fs); // get current file pointer
@@ -155,20 +157,66 @@ void get_file(char *filename)
             fclose(fs);
             //printf("\n%s\n", buffer);
 
-            recv(accept_var[0], sample, 5, 0);  //for sync
-            n = send(accept_var[0], buffer, size, 0);
+            recv(socket_connection_id, sample, 5, 0);  //for sync
+            n = send(socket_connection_id, buffer, size, 0);
 
             printf("n send->%d\n", n);
             sleep(1);
         }
     }
     pclose(f);
-
+    shutdown(socket_connection_id,SHUT_RDWR);
+    close(socket_connection_id);
 
 }
 
 
+void webserver_handler(int socket_connection_id)
+{
+  char buffer[100];
+  char *filename;
+  int n = recv(socket_connection_id, buffer, sizeof(buffer), 0);
+  buffer[n] = '\0';
+  printf("%s\n", buffer);
+  // Authenticate credentials
+  int a = authenticate_credentials(buffer);
+  if (a == 1)
+  {
+      printf("Authentication failed\n");
+      shutdown(socket_connection_id,SHUT_RDWR);
+      close(socket_connection_id);
+  }
 
+  bzero(buffer, sizeof(buffer));
+  // Receive command from client
+  n = recv(socket_connection_id, buffer, sizeof(buffer), 0);
+  printf("command-> %s\n", buffer);
+
+
+/*  n = recv(accept_var[i], buffer, sizeof(buffer), 0);
+  printf("command-> %s", buffer);*/
+
+  if (strstr(buffer,"get") != NULL)
+  {
+    filename = strstr(buffer, " ");
+    filename++;
+    get_file(filename, socket_connection_id);
+  }
+  else if (strstr(buffer,"put") != NULL)
+  {
+      filename = strstr(buffer, " ");
+      filename++;
+      put_file(socket_connection_id);
+  }
+  else if (strstr(buffer, "list") != NULL)
+  {
+      //call list function
+      printf("list called!/n\n");
+  }
+  else printf("Entered wrong command\n");
+  shutdown(socket_connection_id,SHUT_RDWR);
+  close(socket_connection_id);
+}
 
 
 int main(int argc, char **argv)
@@ -177,7 +225,8 @@ int main(int argc, char **argv)
     tv.tv_sec = 1;
     tv.tv_usec = 0;
     int socket_server;
-    char *filename;
+    pid_t child;
+
     int port = atoi(argv[2]);
     printf("port %d\n", port);
     if (argc < 3)
@@ -190,10 +239,9 @@ int main(int argc, char **argv)
     sprintf(cmd,"mkdir -p %s", argv[1]);
     system(cmd);
     socket_server = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_server < 0)
+    if (!socket_server)
     {
         perror("Error creating the socket");
-        exit(-1);
     }
     setsockopt(socket_server, SOL_SOCKET,SO_REUSEADDR,&tv,sizeof(tv));
     server_addr.sin_family = AF_INET;
@@ -210,52 +258,31 @@ int main(int argc, char **argv)
 		    perror("ERROR listening");
 	  }
 	  else printf("Listen success\n");
-    int addr_length = sizeof(client_addr);
+
+
+    while(1){
+      int addr_length = sizeof(client_addr);
     accept_var[i] = accept(socket_server, (struct sockaddr *) &client_addr, &addr_length);
     if (accept_var[i]<0)
     {
-	       perror("ERROR on accept");
-		     close(accept_var[i]);
+	      perror("ERROR on accept");
+      //  shutdown(accept_var[i],SHUT_RDWR);
+		    close(accept_var[i]);
     }
     else printf("Accept complete\n");
-    char buffer[100];
-    int n = recv(accept_var[i], buffer, sizeof(buffer), 0);
-    printf("%s\n", buffer);
-    // Authenticate credentials
-    int a = authenticate_credentials(buffer);
-    if (a == 1)
+
+    child = fork();
+    if (child == 0)
     {
-        printf("Authentication failed\n");
-        close(accept_var[i]);
+      webserver_handler(accept_var[i]);
+      close(socket_server);
+      exit(0);
     }
-
-    bzero(buffer, sizeof(buffer));
-    // Receive command from client
-    n = recv(accept_var[i], buffer, sizeof(buffer), 0);
-    printf("command-> %s\n", buffer);
-
-
-  /*  n = recv(accept_var[i], buffer, sizeof(buffer), 0);
-    printf("command-> %s", buffer);*/
-
-    if (strstr(buffer,"get") != NULL)
-    {
-      filename = strstr(buffer, " ");
-      filename++;
-      get_file(filename);
+    else {
+      close(accept_var[i]);
     }
-    else if (strstr(buffer,"put") != NULL)
-    {
-        filename = strstr(buffer, " ");
-        filename++;
-        put_file();
-    }
-    else if (strstr(buffer, "list") != NULL)
-    {
-        //call list function
-        printf("list called!/n\n");
-    }
-    else printf("Entered wrong command\n");
-
+    i++;
+	   i = i%99;
+}
     return 0;
 }
