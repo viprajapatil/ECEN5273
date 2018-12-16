@@ -336,12 +336,53 @@ int main(int argc, char **argv)
     get_conf_info();
 
     //connect to all the 4 servers
-    connect_to_servers();
+    //connect_to_servers();
+    while(1)
+    {
+    for (int i=0; i<4; i++)
+    {
+        //set timeout for 1 sec for connection;
+        struct timeval timeout;
+	      timeout.tv_sec = 1;
+	      timeout.tv_usec = 0;
+      //  printf("port number->  %d\n", dfs_server_port[i]);
+        bzero(&server_addr[i],sizeof(server_addr[i]));               //zero the struct
+        server_addr[i].sin_family = AF_INET;                 //address family
+        server_addr[i].sin_port = htons(dfs_server_port[i]);      //sets port to network byte order
+        server_addr[i].sin_addr.s_addr = inet_addr("127.0.0.1"); //sets remote IP address
 
+        sockfd[i] = socket(AF_INET, SOCK_STREAM, 0);
+        if (sockfd[i] < 0)
+        {
+            perror("Unable to open socket");
+        }
+        int server_connect = connect(sockfd[i], (struct sockaddr *) &server_addr[i], sizeof(server_addr[i]));
+	      if (server_connect < 0)
+	      {
+			       perror("Failed to connect to host");
+			       close(sockfd[i]);
+			       //return;
+	      }
+
+        char authen[100];
+        sprintf(authen,"%s %s %s",username,password,subfolder);
+        printf("authen len->%d\n", strlen(authen));
+        int nbytes = send(sockfd[i], authen, strlen(authen), 0);
+        if (nbytes < 0){
+          printf("nbytes-> %d\n", nbytes);
+        }
+        else printf("nbytes-> %d\n", nbytes);
+
+
+        printf("Sucessful connection for port %d \n", dfs_server_port[i]);
+	      //setsockopt (sockfd[i], SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,sizeof(timeout);
+      }
 
     //take command type as input
+    memset(command,0,sizeof(command));
     printf("Enter command: ");
     scanf("%[^\t\n]s", command);
+    getchar();
     for (int i=0; i<4; i++)
     {
       int nbytes = send(sockfd[i], command, strlen(command), 0);
@@ -369,5 +410,6 @@ int main(int argc, char **argv)
     }
     else printf("Entered wrong command, enter -> list, get or put\n");
 
+}
     return 0;
 }
