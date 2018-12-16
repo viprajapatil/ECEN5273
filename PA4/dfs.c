@@ -70,33 +70,48 @@ int authenticate_credentials(char buffer[])
   exit(-1);
   return 1;
 }
+
+
 void put_file()
 {
     char file_ext[100], file_path[100];
-    char buffer[1000];
-    int n;
+    char buffer[1000000];
+    long long int n;
     for(int i=0; i<2; i++)
     {
     //receive 2 files from the client and store it in subfolder
-    bzero(file_ext, sizeof(file_ext));
-    bzero(file_path, sizeof(file_path));
+    memset(file_ext,'\0', sizeof(file_ext));
+    memset(file_path,'\0' ,sizeof(file_path));
     // Receive command from client
+    send(accept_var[0],"hello",5,0);
     n = recv(accept_var[0], file_ext, sizeof(file_ext), 0);
     printf("file ext rec-> %s\n", file_ext);
     bzero(buffer, sizeof(buffer));
-    sleep(1);
+    //sleep(1);
     // Receive command from client
-    n = recv(accept_var[0], buffer, sizeof(buffer), 0);
-    printf("\ncontent-> %s   n-> %d\n", buffer, n);
-
-    sprintf(file_path,"./%s/%s",directory,file_ext);
-    printf("file ext-> %s\n", file_path);
-    FILE *f1 = fopen(file_path,"w");
-    fwrite(buffer,1,n,f1);
-    fclose(f1);
+    n = 1;
+    while(n > 0){
+      n = recv(accept_var[0], buffer, sizeof(buffer), 0);
+      if(n == 0)
+      {
+        break;
+      }
+      //printf("\ncontent-> %s   n-> %lld\n", buffer, n);
+      sleep(1);
+      sprintf(file_path,"./%s/%s",directory,file_ext);
+      printf("file ext-> %s\n", file_path);
+      if(n > 0)
+      {
+        FILE *f1 = fopen(file_path,"wb");
+        fwrite(buffer,1,n,f1);
+        fclose(f1);
+      }
+      bzero(file_ext,sizeof(file_ext));
+    if(n < sizeof(buffer))
+      break;
     }
 }
-
+}
 
 
 
