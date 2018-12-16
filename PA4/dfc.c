@@ -92,6 +92,7 @@ void connect_to_servers()
 
         char authen[100];
         sprintf(authen,"%s %s %s",username,password,subfolder);
+        printf("authen len->%d\n", strlen(authen));
         int nbytes = send(sockfd[i], authen, strlen(authen), 0);
         if (nbytes < 0){
           printf("nbytes-> %d\n", nbytes);
