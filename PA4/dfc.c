@@ -260,7 +260,7 @@ char* merge_file(char file[])
     s2 = strtok(NULL,".");
     s1 = strtok(NULL,".");
     *(file_name + strlen(file_name)) = '.';
-    *(file_name + strlen(file_name)-2) = '\0';
+    //*(file_name + strlen(file_name)-2) = '\0';
     printf("*******%s********\n", file_name);
     return file_name;
 }
@@ -270,26 +270,39 @@ char* merge_file(char file[])
 
 void get_file()
 {   int nbytes, h=0;
+    long long int n;
     char ser[10] = "random";
     char filename_get[100];
     char *file_name;
     char p[4][100];
-    char server_data[1000];
+    char server_data[1024*1024*6];
     for(int i=0; i<4; i++)
     {
-        nbytes = send(sockfd[i], ser, sizeof(ser), 0);
+
         for(int j=0; j<2; j++)
         {
           bzero(filename_get,sizeof(filename_get));
+          bzero(server_data,sizeof(server_data));
+          send(sockfd[i], "hello", 5, 0); //for sync
           nbytes = recv(sockfd[i], filename_get, sizeof(filename_get), 0);
-          printf("file rec->%s",filename_get);
-          nbytes = recv(sockfd[i], server_data, sizeof(server_data), 0);
-          printf("nbytes->%d\n", nbytes);
-          char d[10];
-          sprintf(d,"file%d%d",i,j);
+          printf("file rec->%s\n",filename_get);
           FILE *f = fopen(filename_get,"wb");
-          fwrite(server_data,1,nbytes,f);
+          nbytes = 1;
+          // while(nbytes>0)
+          // {
+              send(sockfd[i], "hello", 5, 0); //for sync
+              nbytes = recv(sockfd[i], server_data, sizeof(server_data), 0);
+//              if (nbytes == 0)
+//                  break;
+              if (nbytes > 0)
+              {
+              fwrite(server_data,1,nbytes,f);
+              }
+//              if(n < sizeof(server_data))
+//                break;
+//          }
           fclose(f);
+
         }
         file_name = merge_file(filename_get);
     }
