@@ -25,6 +25,9 @@ int socket_server,accept_var[100], socket_server_proxy;
 struct sockaddr_in server_addr, client_addr;
 int i = 0;
 char directory[100];
+char encpt_password[20];
+
+
 
 int authenticate_credentials(char buffer[])
 {
@@ -36,7 +39,7 @@ int authenticate_credentials(char buffer[])
   char *password = strstr(buffer, " ");
   password = strtok(NULL, "");
   password = strtok(password, " ");
-
+  sprintf(encpt_password,"%s",password);
   char *sub;
   sub = strtok(subb," ");
   sub = strtok(NULL, " ");
@@ -44,7 +47,7 @@ int authenticate_credentials(char buffer[])
   char cmdsub[100];
   bzero(cmdsub,sizeof(cmdsub));
   sprintf(cmdsub,"mkdir -p %s/%s/%s",directory,username,sub);
-  sprintf(directory,"%s/%s/%s",directory,username,sub);
+  sprintf(directory,"%s/%s",directory,username);
   FILE *fr = fopen("dfs.conf","r");
   if (fr == NULL)
   {
@@ -72,11 +75,15 @@ int authenticate_credentials(char buffer[])
 }
 
 
-void put_file(int socket_connection_id)
+void put_file(int socket_connection_id, char *sub)
 {
-    char file_ext[100], file_path[100];
+
+    char file_ext[20], file_path[100];
+    char directory_put[100];
+    bzero(directory_put, sizeof(directory_put));
+    sprintf(directory_put,"%s/%s",directory,sub);
     char buffer[1000000];
-    long long int n;
+    int n;
     for(int i=0; i<2; i++)
     {
     //receive 2 files from the client and store it in subfolder
@@ -85,21 +92,22 @@ void put_file(int socket_connection_id)
     // Receive command from client
     send(socket_connection_id,"hello",5,0);
     n = recv(socket_connection_id, file_ext, sizeof(file_ext), 0);
-    printf("file ext rec-> %s\n", file_ext);
+    printf("file ext rec-> %s, bytes->%d\n", file_ext,n);
     bzero(buffer, sizeof(buffer));
     //sleep(1);
     // Receive command from client
+    send(socket_connection_id,"jello",5,0);//for sync
     n = 1;
     while(n > 0){
       n = recv(socket_connection_id, buffer, sizeof(buffer), 0);
+      printf("rec n->%d\n", n);
       if(n == 0)
       {
         break;
       }
       //printf("\ncontent-> %s   n-> %lld\n", buffer, n);
       sleep(1);
-      sprintf(file_path,"./%s/%s",directory,file_ext);
-      printf("file ext-> %s\n", file_path);
+      sprintf(file_path,"./%s/%s",directory_put,file_ext);
       if(n > 0)
       {
         FILE *f1 = fopen(file_path,"wb");
@@ -117,52 +125,80 @@ close(socket_connection_id);
 
 
 
-void get_file(char *filename, int socket_connection_id)
+void get_file(char *filename, int socket_connection_id, char *sub)
 {
+    int c = 0;
     char sample[10];
     char cmd[100];
     char line[100];
+    char directory_get[100];
+    bzero(directory_get,sizeof(directory_get));
+    sprintf(directory_get,"%s/%s",directory,sub);
     //send all files to client
-
     char file[100];
-    sprintf(cmd,"cd %s;ls -la",directory);
+    sprintf(cmd,"cd %s;ls -a",directory_get);
     FILE *f = popen(cmd, "r");
+
     while (fgets(line, 100, f) != NULL) {
         bzero(file,sizeof(file));
         sprintf(file,".%s",filename);
-        char *fw = strstr(line,file);
-        fw = strtok(fw,"\n");
-        if (fw != NULL)
+        char *fs = strstr(line,file);
+        if (fs != NULL)
         {
-            bzero(file,sizeof(file));
-            sprintf(file,"./%s/%s",directory,fw);
-            FILE *fs = fopen(file,"rb");
-            if (fs == NULL)
-            {
-              perror("fopen error:");
-            }
-            char filename_get[100];
-            bzero(filename_get,sizeof(filename_get));
-            sprintf(filename_get,"%s",fw);
+          char *fw = strstr(line,file);
+          fw = strtok(fw,"\n");
+          if (fw != NULL)
+          {   printf("fw->%s\n", fw);
+              bzero(file,sizeof(file));
+              sprintf(file,"./%s/%s",directory_get,fw);
+              FILE *fs = fopen(file,"rb");
+              if (fs == NULL)
+              {
+                perror("fopen error:");
+              }
+              char filename_get[100];
+              bzero(filename_get,sizeof(filename_get));
+              sprintf(filename_get,"%s",fw);
+              filename_get[strlen(filename_get)] = '\0';
+              recv(socket_connection_id, sample, 5, 0); //for sync
+              //printf("recv sample\n");
+              int n = send(socket_connection_id, filename_get, strlen(filename_get), 0);
+              printf("\nfile_ext bytes->%d\n", n);
+              sleep(1);
+              fseek(fs, 0, SEEK_END); // seek to end of file
+              int size = ftell(fs); // get current file pointer
+              fseek(fs, 0, SEEK_SET); // seek back to beginning of file
+              char buffer[size];
+              memset(buffer,'\0',sizeof(buffer));
+              fread(buffer,size,1,fs);
+              fclose(fs);
+              //printf("\n%s\n", buffer);
 
-            recv(socket_connection_id, sample, 5, 0); //for sync
-            int n = send(socket_connection_id, filename_get, sizeof(filename_get), 0);
+              recv(socket_connection_id, sample, 5, 0);  //for sync
+              printf("recv sample content\n");
+              n = send(socket_connection_id, buffer, size, 0);
+              printf("n send->%d\n", n);
+              sleep(1);
+              c++;
+              if(c > 2)
+              {
+                break;
+              }
+          }
 
-            fseek(fs, 0, SEEK_END); // seek to end of file
-            int size = ftell(fs); // get current file pointer
-            fseek(fs, 0, SEEK_SET); // seek back to beginning of file
-            char buffer[size];
-            memset(buffer,'\0',sizeof(buffer));
-            fread(buffer,size,1,fs);
-            fclose(fs);
-            //printf("\n%s\n", buffer);
-
-            recv(socket_connection_id, sample, 5, 0);  //for sync
-            n = send(socket_connection_id, buffer, size, 0);
-
-            printf("n send->%d\n", n);
-            sleep(1);
         }
+
+    }
+    if (c==1)
+    {
+      recv(socket_connection_id, sample, 5, 0); //for sync
+      printf("recv sample\n");
+      char error_file[100] = "ERROR";
+      int n = send(socket_connection_id, error_file, strlen(error_file), 0);
+      printf("only 1 file");
+      // recv(socket_connection_id, sample, 5, 0);  //for sync
+      // printf("recv sample content\n");
+      // n = send(socket_connection_id, buffer, size, 0);
     }
     pclose(f);
     shutdown(socket_connection_id,SHUT_RDWR);
@@ -171,7 +207,38 @@ void get_file(char *filename, int socket_connection_id)
 }
 
 
-void webserver_handler(int socket_connection_id)
+void list_func(int socket_connection_id,char *sub)
+{
+    char directory_list[100];
+    char line[100];
+    bzero(directory_list,sizeof(directory_list));
+    sprintf(directory_list,"%s/%s",directory,sub);
+    char cmd[100];
+    bzero(cmd,sizeof(cmd));
+    sprintf(cmd,"cd %s;ls -a > list_file.txt",directory_list);
+    system(cmd);
+    char some[100];bzero(some,sizeof(some));
+    sprintf(some,"./%s/list_file.txt",directory_list);
+    printf("d->%s\n", some);
+    FILE *fs = fopen(some,"rb");
+    if (fs==NULL)
+        perror("fopen error");
+
+        fseek(fs, 0, SEEK_END); // seek to end of file
+        int size = ftell(fs); // get current file pointer
+        fseek(fs, 0, SEEK_SET); // seek back to beginning of file
+        char buffer[size];
+        memset(buffer,'\0',sizeof(buffer));
+        fread(buffer,size,1,fs);
+        fclose(fs);
+    int n = send(socket_connection_id, buffer, size, 0);
+    shutdown(socket_connection_id,SHUT_RDWR);
+    close(socket_connection_id);
+}
+
+
+
+void handler(int socket_connection_id)
 {
   char buffer[100];
   char *filename;
@@ -198,20 +265,28 @@ void webserver_handler(int socket_connection_id)
 
   if (strstr(buffer,"get") != NULL)
   {
-    filename = strstr(buffer, " ");
-    filename++;
-    get_file(filename, socket_connection_id);
+    filename = strtok(buffer, " ");
+    filename = strtok(NULL, " ");
+    char *sub = strtok(NULL, " ");
+    printf("entered get loop..\n");
+    get_file(filename, socket_connection_id, sub);
   }
   else if (strstr(buffer,"put") != NULL)
   {
-      filename = strstr(buffer, " ");
-      filename++;
-      put_file(socket_connection_id);
+      // filename = strstr(buffer, " ");
+      // filename++;
+      filename = strtok(buffer, " ");
+      filename = strtok(NULL, " ");
+      char *sub = strtok(NULL, " ");
+      printf("file->%s, sub->%s\n", filename,sub);
+      put_file(socket_connection_id, sub);
   }
   else if (strstr(buffer, "list") != NULL)
   {
       //call list function
-      printf("list called!/n\n");
+      char *sub = strtok(buffer, " ");
+      sub = strtok(NULL, " ");
+      list_func(socket_connection_id,sub);
   }
   else printf("Entered wrong command\n");
   shutdown(socket_connection_id,SHUT_RDWR);
@@ -262,6 +337,7 @@ int main(int argc, char **argv)
 
     while(1){
       int addr_length = sizeof(client_addr);
+      printf("****************************\n");
     accept_var[i] = accept(socket_server, (struct sockaddr *) &client_addr, &addr_length);
     if (accept_var[i]<0)
     {
@@ -274,7 +350,7 @@ int main(int argc, char **argv)
     child = fork();
     if (child == 0)
     {
-      webserver_handler(accept_var[i]);
+      handler(accept_var[i]);
       close(socket_server);
       exit(0);
     }
